@@ -13,21 +13,32 @@ const Register = () => {
   const [message, setMessage] = useState("");
 
   const handleRegister = async (data: any) => {
+    console.log("▶️ handleRegister called with:", data);
     setLoading(true);
     setMessage("");
     try {
       setEmail(data.email);
       setFormData(data);
 
+      console.log("📤 Sending register request:", data);
       const res = await POST("/auth/register", data);
+      console.log("📥 Register response:", res);
 
-      if (res.status === 200) {
+      if (
+        res.status === 200 ||
+        res.status === 201 ||
+        res.statusCode === 200 ||
+        res.statusCode === 201
+      ) {
+        console.log("✅ OTP modal should open now");
         setMessage(res.message || "OTP sent to your email");
         setShowOTP(true);
       } else {
+        console.log("❌ Registration failed:", res.message);
         setMessage(res.message || "Registration failed");
       }
     } catch (err: any) {
+      console.error("💥 Register error:", err);
       setMessage(err?.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -38,9 +49,14 @@ const Register = () => {
     setLoading(true);
     setMessage("");
     try {
-      const res = await POST("/auth/verify-otp", { email, otp, ...formData });
+      const res = await POST("/auth/verify-otp-register", {
+        email,
+        otp,
+        userData: formData,
+      });
+      console.log("📥 Verify OTP response:", res);
 
-      if (res.status === 200) {
+      if (res.status === 200 || res.status === 201) {
         setMessage(res.message || "Account verified!");
         setShowOTP(false);
         alert("Account verified! Redirecting to login...");
@@ -49,6 +65,7 @@ const Register = () => {
         setMessage(res.message || "OTP verification failed");
       }
     } catch (err: any) {
+      console.error("💥 Verify OTP error:", err);
       setMessage(err?.message || "OTP verification failed");
     } finally {
       setLoading(false);
@@ -59,10 +76,12 @@ const Register = () => {
     setLoading(true);
     setMessage("");
     try {
-      const res = await POST("/auth/resend-otp", { email });
+      const res = await POST("/auth/resend-otp-register", { email });
+      console.log("📥 Resend OTP response:", res);
 
       setMessage(res.message || "OTP resent!");
     } catch (err: any) {
+      console.error("💥 Resend OTP error:", err);
       setMessage(err?.message || "Failed to resend OTP");
     } finally {
       setLoading(false);

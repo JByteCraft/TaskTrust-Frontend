@@ -16,22 +16,27 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+) => {
+  console.log("✏️ Field changed:", e.target.name, "=", e.target.value);
+  setFormData({ ...formData, [e.target.name]: e.target.value });
+};
 
-  const handleRoleChange = (role: "customer" | "tasker") => {
-    setFormData({ ...formData, role });
-  };
+const handleRoleChange = (role: "customer" | "tasker") => {
+  console.log("🔄 Role changed:", role);
+  setFormData({ ...formData, role });
+};
 
-  const handleSubmit = () => {
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
-    onShowOTP(formData);
-  };
+const handleSubmit = () => {
+  console.log("▶️ handleSubmit called with:", formData);
+  if (formData.password !== formData.confirmPassword) {
+    alert("Passwords do not match!");
+    return;
+  }
+  const { confirmPassword, ...payload } = formData;
+  console.log("📤 Submitting payload:", payload);
+  onShowOTP(payload);
+};
 
   return (
     <div>
@@ -93,7 +98,6 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
             onChange={handleChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white"
           >
-            <option value="">Select Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>

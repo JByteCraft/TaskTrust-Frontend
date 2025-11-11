@@ -24,20 +24,25 @@ const OTPModal: React.FC<OTPModalProps> = ({
   loading = false,
   message = "",
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log("ℹ️ OTPModal not open");
+    return null;
+  }
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     index: number
   ) => {
     const value = e.target.value.replace(/[^0-9]/g, "");
+    console.log(`✏️ OTP input[${index}] changed:`, value);
     if (!value) return;
 
     const otpArray = otp.padEnd(6, "0").split("");
     otpArray[index] = value;
-    setOtp(otpArray.join("").slice(0, 6));
+    const newOtp = otpArray.join("").slice(0, 6);
+    console.log("🔢 New OTP value:", newOtp);
+    setOtp(newOtp);
 
-    // Auto-focus next input
     const nextInput = document.getElementById(`otp-${index + 1}`);
     if (nextInput) (nextInput as HTMLInputElement).focus();
   };
@@ -48,9 +53,7 @@ const OTPModal: React.FC<OTPModalProps> = ({
         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
         onClick={onClose}
       ></div>
-
       <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
@@ -69,8 +72,6 @@ const OTPModal: React.FC<OTPModalProps> = ({
             />
           </svg>
         </button>
-
-        {/* Modal Header */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -96,8 +97,6 @@ const OTPModal: React.FC<OTPModalProps> = ({
           <p className="text-sm text-blue-600 font-medium mt-1">{email}</p>
           {message && <p className="text-sm text-red-500 mt-2">{message}</p>}
         </div>
-
-        {/* OTP Input Fields */}
         <div className="flex justify-center gap-3 mb-6">
           {Array.from({ length: 6 }).map((_, index) => (
             <input
@@ -112,8 +111,6 @@ const OTPModal: React.FC<OTPModalProps> = ({
             />
           ))}
         </div>
-
-        {/* Verify Button */}
         <button
           onClick={onVerify}
           disabled={loading || otp.length < 6}
@@ -121,8 +118,6 @@ const OTPModal: React.FC<OTPModalProps> = ({
         >
           {loading ? "Verifying..." : "Verify Code"}
         </button>
-
-        {/* Resend Link */}
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Didn't receive the code?{" "}

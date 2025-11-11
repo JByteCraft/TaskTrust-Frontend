@@ -1,9 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
-import registerReducer from "./actions/registerAction";
 
 export const store = configureStore({
   reducer: {
-    register: registerReducer,
   },
 });
 
