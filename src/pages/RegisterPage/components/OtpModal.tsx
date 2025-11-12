@@ -1,6 +1,3 @@
-// src/pages/RegisterPage/components/OtpModal.tsx
-import React from "react";
-
 interface OTPModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,22 +26,13 @@ const OTPModal: React.FC<OTPModalProps> = ({
     return null;
   }
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    index: number
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, "");
-    console.log(`✏️ OTP input[${index}] changed:`, value);
-    if (!value) return;
-
-    const otpArray = otp.padEnd(6, "0").split("");
-    otpArray[index] = value;
-    const newOtp = otpArray.join("").slice(0, 6);
-    console.log("🔢 New OTP value:", newOtp);
-    setOtp(newOtp);
-
-    const nextInput = document.getElementById(`otp-${index + 1}`);
-    if (nextInput) (nextInput as HTMLInputElement).focus();
+    console.log("✏️ OTP input changed:", value);
+    if (value.length <= 6) {
+      console.log("🔢 New OTP value:", value);
+      setOtp(value);
+    }
   };
 
   return (
@@ -55,7 +43,10 @@ const OTPModal: React.FC<OTPModalProps> = ({
       ></div>
       <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Close"
+          title="Close"
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
         >
           <svg
@@ -97,19 +88,18 @@ const OTPModal: React.FC<OTPModalProps> = ({
           <p className="text-sm text-blue-600 font-medium mt-1">{email}</p>
           {message && <p className="text-sm text-red-500 mt-2">{message}</p>}
         </div>
-        <div className="flex justify-center gap-3 mb-6">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <input
-              key={index}
-              id={`otp-${index}`}
-              type="text"
-              maxLength={1}
-              value={otp[index] || ""}
-              onChange={(e) => handleInputChange(e, index)}
-              className="w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-              placeholder="0"
-            />
-          ))}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+            Enter 6-digit code
+          </label>
+          <input
+            type="text"
+            maxLength={6}
+            value={otp}
+            onChange={handleInputChange}
+            className="w-full px-4 py-3 text-center text-2xl font-bold tracking-widest border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+            placeholder="000000"
+          />
         </div>
         <button
           onClick={onVerify}
@@ -122,9 +112,10 @@ const OTPModal: React.FC<OTPModalProps> = ({
           <p className="text-sm text-gray-600">
             Didn't receive the code?{" "}
             <button
+              type="button"
               onClick={onResend}
               disabled={loading}
-              className="text-blue-600 hover:text-blue-700 font-semibold"
+              className="text-blue-600 hover:text-blue-700 font-semibold disabled:opacity-50"
             >
               Resend
             </button>

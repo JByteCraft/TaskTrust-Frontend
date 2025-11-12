@@ -1,110 +1,110 @@
 // src/lib/utils/fetch.utils.ts
 import axios, { type AxiosResponse } from "axios";
-import { RESPONSE } from "../utils/response.util";
 import { API_BASE_URL } from "../api/config";
 
-export const API = axios.create({
-  baseURL: API_BASE_URL || "http://192.168.254.106:4444",
+const API = axios.create({
+  baseURL: API_BASE_URL || "http://localhost:4444",
   withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-export const GET = async <T>(
+export const GET = async <T = any>(
   url: string,
-  params: object = {},
+  params: string = "",
   token?: string
-) => {
+): Promise<T> => {
   try {
-    const response: AxiosResponse<T> = await API.get(url, {
-      params,
+    const response: AxiosResponse<T> = await API.get(`${url}${params}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    return RESPONSE(response.status, response.data, "GET request successful");
+    return response.data;
   } catch (error: any) {
-    return RESPONSE(
-      error.response?.status || 500,
-      {} as T,
-      error.response?.data?.message || "GET request failed"
+    console.error("GET request error:", error);
+    return (
+      error.response?.data || { status: 500, message: "GET request failed" }
     );
   }
 };
 
-export const POST = async <T>(
+export const POST = async <T = any>(
   url: string,
-  data: object = {},
+  params: string = "",
+  body: object = {},
   token?: string
-) => {
+): Promise<T> => {
   try {
-    const response: AxiosResponse<T> = await API.post(url, data, {
+    const response: AxiosResponse<T> = await API.post(`${url}${params}`, body, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    return RESPONSE(response.status, response.data, "POST request successful");
+    return response.data;
   } catch (error: any) {
-    return RESPONSE(
-      error.response?.status || 500,
-      {} as T,
-      error.response?.data?.message || "POST request failed"
+    console.error("POST request error:", error);
+    return (
+      error.response?.data || { status: 500, message: "POST request failed" }
     );
   }
 };
 
-export const PUT = async <T>(
+export const PUT = async <T = any>(
   url: string,
-  data: object = {},
+  params: string = "",
+  body: object = {},
   token?: string
-) => {
+): Promise<T> => {
   try {
-    const response: AxiosResponse<T> = await API.put(url, data, {
+    const response: AxiosResponse<T> = await API.put(`${url}${params}`, body, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    return RESPONSE(response.status, response.data, "PUT request successful");
+    return response.data;
   } catch (error: any) {
-    return RESPONSE(
-      error.response?.status || 500,
-      {} as T,
-      error.response?.data?.message || "PUT request failed"
+    console.error("PUT request error:", error);
+    return (
+      error.response?.data || { status: 500, message: "PUT request failed" }
     );
   }
 };
 
-export const PATCH = async <T>(
+export const PATCH = async <T = any>(
   url: string,
-  data: object = {},
+  params: string = "",
+  body: object = {},
   token?: string
-) => {
+): Promise<T> => {
   try {
-    const response: AxiosResponse<T> = await API.patch(url, data, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    return RESPONSE(response.status, response.data, "PATCH request successful");
+    const response: AxiosResponse<T> = await API.patch(
+      `${url}${params}`,
+      body,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    );
+    return response.data;
   } catch (error: any) {
-    return RESPONSE(
-      error.response?.status || 500,
-      {} as T,
-      error.response?.data?.message || "PATCH request failed"
+    console.error("PATCH request error:", error);
+    return (
+      error.response?.data || { status: 500, message: "PATCH request failed" }
     );
   }
 };
 
-export const DELETE = async <T>(
+export const DELETE = async <T = any>(
   url: string,
-  data: object = {},
+  params: string = "",
+  body: object = {},
   token?: string
-) => {
+): Promise<T> => {
   try {
-    const response: AxiosResponse<T> = await API.delete(url, {
-      data,
+    const response: AxiosResponse<T> = await API.delete(`${url}${params}`, {
+      data: body,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    return RESPONSE(
-      response.status,
-      response.data,
-      "DELETE request successful"
-    );
+    return response.data;
   } catch (error: any) {
-    return RESPONSE(
-      error.response?.status || 500,
-      {} as T,
-      error.response?.data?.message || "DELETE request failed"
+    console.error("DELETE request error:", error);
+    return (
+      error.response?.data || { status: 500, message: "DELETE request failed" }
     );
   }
 };

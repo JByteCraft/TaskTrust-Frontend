@@ -1,10 +1,24 @@
 // src/pages/RegisterPage/components/RegisterForm.tsx
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { IoEyeOutline, IoEyeOffOutline } from "react-icons/io5";
+
+type RegisterFormData = {
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  gender: "male" | "female";
+  role: "customer" | "tasker";
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
 
 const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
   const navigate = useNavigate();
-  const [formData, setFormData] = React.useState({
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formData, setFormData] = useState<RegisterFormData>({
     firstName: "",
     lastName: "",
     middleName: "",
@@ -14,45 +28,118 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
     password: "",
     confirmPassword: "",
   });
+  const [errors, setErrors] = useState<{
+    email: string;
+    password: string;
+    confirmPassword: string;
+  }>({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+
+  const validate = (data: RegisterFormData) => {
+    const validationErrors = {
+      email: "",
+      password: "",
+      confirmPassword: "",
+    };
+
+    if (!data.email.trim()) {
+      validationErrors.email = "Email is required";
+    } else if (!emailRegex.test(data.email)) {
+      validationErrors.email = "Invalid email format";
+    }
+
+    if (!data.password) {
+      validationErrors.password = "Password is required";
+    } else if (!passwordRegex.test(data.password)) {
+      validationErrors.password =
+        "Must be 8+ chars, include 1 uppercase letter & 1 symbol";
+    }
+
+    if (!data.confirmPassword) {
+      validationErrors.confirmPassword = "Please confirm your password";
+    } else if (data.password !== data.confirmPassword) {
+      validationErrors.confirmPassword = "Passwords do not match";
+    }
+
+    return validationErrors;
+  };
 
   const handleChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-) => {
-  console.log("✏️ Field changed:", e.target.name, "=", e.target.value);
-  setFormData({ ...formData, [e.target.name]: e.target.value });
-};
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    const updatedData = { ...formData, [name]: value } as RegisterFormData;
+    setFormData(updatedData);
+    setErrors(validate(updatedData));
+  };
 
-const handleRoleChange = (role: "customer" | "tasker") => {
-  console.log("🔄 Role changed:", role);
-  setFormData({ ...formData, role });
-};
+  const handleBlur = (
+    e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setErrors(validate(formData));
+  };
 
-const handleSubmit = () => {
-  console.log("▶️ handleSubmit called with:", formData);
-  if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match!");
-    return;
-  }
-  const { confirmPassword, ...payload } = formData;
-  console.log("📤 Submitting payload:", payload);
-  onShowOTP(payload);
-};
+  const handleRoleChange = (role: "customer" | "tasker") => {
+    setFormData({ ...formData, role });
+  };
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    const validationErrors = validate(formData);
+    setErrors(validationErrors);
+
+    const hasErrors = Object.values(validationErrors).some(
+      (errorMessage) => errorMessage.length > 0
+    );
+    if (hasErrors) {
+      return;
+    }
+    const { confirmPassword, ...payload } = formData;
+    onShowOTP(payload);
+  };
+
+  const shouldShowEmailError =
+    !!errors.email && (touched.email || submitted || formData.email.length > 0);
+  const shouldShowPasswordError =
+    !!errors.password &&
+    (touched.password || submitted || formData.password.length > 0);
+  const shouldShowConfirmPasswordError =
+    !!errors.confirmPassword &&
+    (touched.confirmPassword ||
+      submitted ||
+      formData.confirmPassword.length > 0);
 
   return (
     <div>
+      {/* Register Form Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
         <p className="text-gray-600 mt-2">
           Sign up to get started with TaskTrust
         </p>
       </div>
+
+      {/* Form Fields */}
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="firstName"
+            >
               First Name
             </label>
             <input
+              id="firstName"
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
@@ -62,10 +149,14 @@ const handleSubmit = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="lastName"
+            >
               Last Name
             </label>
             <input
+              id="lastName"
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
@@ -75,11 +166,16 @@ const handleSubmit = () => {
             />
           </div>
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="middleName"
+          >
             Middle Name
           </label>
           <input
+            id="middleName"
             name="middleName"
             value={formData.middleName}
             onChange={handleChange}
@@ -88,11 +184,16 @@ const handleSubmit = () => {
             placeholder="Smith"
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="gender"
+          >
             Gender
           </label>
           <select
+            id="gender"
             name="gender"
             value={formData.gender}
             onChange={handleChange}
@@ -102,6 +203,7 @@ const handleSubmit = () => {
             <option value="female">Female</option>
           </select>
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Are you a:
@@ -137,51 +239,136 @@ const handleSubmit = () => {
             </button>
           </div>
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="email"
+          >
             Email
           </label>
           <input
+            id="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
+            onBlur={handleBlur}
             type="email"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+            aria-describedby={shouldShowEmailError ? "email-error" : undefined}
+            className={`w-full px-4 py-2 border rounded-lg outline-none transition ${
+              shouldShowEmailError
+                ? "border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            }`}
             placeholder="your@email.com"
           />
+          {shouldShowEmailError && (
+            <p id="email-error" className="mt-1 text-sm text-red-600">
+              {errors.email}
+            </p>
+          )}
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="password"
+          >
             Password
           </label>
-          <input
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-            placeholder="••••••••"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              type={showPassword ? "text" : "password"}
+              aria-describedby={
+                shouldShowPasswordError ? "password-error" : undefined
+              }
+              className={`w-full px-4 py-2 pr-10 border rounded-lg outline-none transition ${
+                shouldShowPasswordError
+                  ? "border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  : "border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              }`}
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition"
+            >
+              {showPassword ? (
+                <IoEyeOffOutline className="w-5 h-5" />
+              ) : (
+                <IoEyeOutline className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+          {shouldShowPasswordError && (
+            <p id="password-error" className="mt-1 text-sm text-red-600">
+              {errors.password}
+            </p>
+          )}
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="confirmPassword"
+          >
             Confirm Password
           </label>
-          <input
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-            placeholder="••••••••"
-          />
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              type={showConfirmPassword ? "text" : "password"}
+              aria-describedby={
+                shouldShowConfirmPasswordError
+                  ? "confirm-password-error"
+                  : undefined
+              }
+              className={`w-full px-4 py-2 pr-10 border rounded-lg outline-none transition ${
+                shouldShowConfirmPasswordError
+                  ? "border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  : "border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              }`}
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition"
+            >
+              {showConfirmPassword ? (
+                <IoEyeOffOutline className="w-5 h-5" />
+              ) : (
+                <IoEyeOutline className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+          {shouldShowConfirmPasswordError && (
+            <p
+              id="confirm-password-error"
+              className="mt-1 text-sm text-red-600"
+            >
+              {errors.confirmPassword}
+            </p>
+          )}
         </div>
+
         <div className="flex items-start">
           <input
             type="checkbox"
+            id="terms"
             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
           />
-          <label className="ml-2 text-sm text-gray-600">
+          <label className="ml-2 text-sm text-gray-600" htmlFor="terms">
             I agree to the{" "}
             <a href="#" className="text-blue-600 hover:underline font-medium">
               Terms of Service
@@ -192,6 +379,7 @@ const handleSubmit = () => {
             </a>
           </label>
         </div>
+
         <button
           onClick={handleSubmit}
           className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition"
@@ -199,15 +387,17 @@ const handleSubmit = () => {
           Create Account
         </button>
       </div>
+
+      {/* Sign in link */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           Already have an account?{" "}
-          <button
+          <a
             onClick={() => navigate("/login")}
             className="text-blue-600 hover:text-blue-700 font-semibold"
           >
             Sign in
-          </button>
+          </a>
         </p>
       </div>
     </div>

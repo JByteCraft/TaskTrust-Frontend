@@ -1,7 +1,87 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import LoginForm from "./components/LoginForm";
+import { POST } from "../../lib/utils/fetch.utils";
+import {
+  getStoredAuthToken,
+  persistAuthToken,
+} from "../../lib/utils/auth.utils";
+
+type LoginPayload = {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+};
 
 const Login = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (getStoredAuthToken()) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
+
+  const extractToken = (response: any) => {
+    if (!response || typeof response !== "object") return "";
+    return (
+      response.token ||
+      response.accessToken ||
+      response.data?.token ||
+      response.data?.accessToken ||
+      response.response?.token ||
+      response.response?.accessToken ||
+      response.response?.data?.token ||
+      response.response?.data?.accessToken ||
+      ""
+    );
+  };
+
+  const handleLogin = async ({ email, password, rememberMe }: LoginPayload) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const res = await POST("/auth/login", "", { email, password });
+      console.log("Login response:", res);
+
+      const isSuccess =
+        res?.status === 200 ||
+        res?.status === 201 ||
+        res?.success === true ||
+        !!res?.token;
+
+      if (!isSuccess) {
+        setMessage(res?.message || "Login failed. Please try again.");
+        return;
+      }
+
+      const token = extractToken(res);
+
+      if (!token) {
+        console.warn("Login succeeded but no token returned:", res);
+        setMessage(
+          "Login successful but token was not provided. Please contact support."
+        );
+        return;
+      }
+
+      persistAuthToken(token, rememberMe);
+      setMessage(res?.message || "Login successful!");
+      navigate("/");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Login failed. Please try again.";
+      setMessage(apiMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -138,7 +218,11 @@ const Login = () => {
                 </div>
               </div>
             </div>
-            <LoginForm />
+            <LoginForm
+              loading={loading}
+              message={message}
+              onSubmit={handleLogin}
+            />
           </div>
           <p className="text-center text-xs text-gray-500 mt-6">
             By signing in, you agree to our{" "}

@@ -2,7 +2,9 @@
 import { useState } from "react";
 import RegisterForm from "./components/RegisterForm";
 import OTPModal from "./components/OtpModal";
+import CreatedUserModal from "./components/CreatedUserModal";
 import { POST } from "../../lib/utils/fetch.utils";
+import { useNavigate } from "react-router-dom";
 
 const Register = () => {
   const [showOTP, setShowOTP] = useState(false);
@@ -11,35 +13,35 @@ const Register = () => {
   const [formData, setFormData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const navigate = useNavigate();
 
   const handleRegister = async (data: any) => {
-    console.log("▶️ handleRegister called with:", data);
+    console.log("handleRegister called with:", data);
     setLoading(true);
     setMessage("");
     try {
       setEmail(data.email);
-      setFormData(data);
+      const normalizedData = { ...data, isVerified: false };
+      setFormData(normalizedData);
 
-      console.log("📤 Sending register request:", data);
-      const res = await POST("/auth/register", data);
-      console.log("📥 Register response:", res);
+      console.log("Sending register request:", "", data);
+      const res = await POST("/auth/register", "", data);
 
-      if (
-        res.status === 200 ||
-        res.status === 201 ||
-        res.statusCode === 200 ||
-        res.statusCode === 201
-      ) {
-        console.log("✅ OTP modal should open now");
+      console.log("Register response:", res);
+
+      if (res.status === 200 || res.status === 201) {
+        console.log("OTP modal should open now");
         setMessage(res.message || "OTP sent to your email");
         setShowOTP(true);
       } else {
-        console.log("❌ Registration failed:", res.message);
+        console.log("Registration failed:", res.message);
         setMessage(res.message || "Registration failed");
       }
     } catch (err: any) {
-      console.error("💥 Register error:", err);
-      setMessage(err?.message || "Registration failed");
+      console.error("Register error:", err);
+      setMessage(err.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -49,24 +51,29 @@ const Register = () => {
     setLoading(true);
     setMessage("");
     try {
-      const res = await POST("/auth/verify-otp-register", {
-        email,
-        otp,
-        userData: formData,
+      const res = await POST("/auth/verify-otp-register", "", {
+        email: email,
+        otp: otp,
+        userData: { ...formData, isVerified: true },
       });
-      console.log("📥 Verify OTP response:", res);
-
-      if (res.status === 200 || res.status === 201) {
-        setMessage(res.message || "Account verified!");
-        setShowOTP(false);
-        alert("Account verified! Redirecting to login...");
-        window.location.href = "/login";
-      } else {
+      console.log("Verify OTP response:", res);
+      if (res.status !== 200 && res.status !== 201) {
         setMessage(res.message || "OTP verification failed");
+        setShowOTP(true);
+        return { status: res.status || 400, data: res.response || {} };
       }
-    } catch (err: any) {
-      console.error("💥 Verify OTP error:", err);
-      setMessage(err?.message || "OTP verification failed");
+      const successText =
+        res.message || "Your account is now active. Welcome to TaskTrust!";
+      setMessage("");
+      setSuccessMessage(successText);
+      setShowOTP(false);
+      setShowSuccessModal(true);
+      return { status: res.status || 201, data: res.response || {} };
+    } catch (error: any) {
+      console.error("Verify OTP error:", error);
+      setMessage(error?.message || "OTP verification failed");
+      setShowOTP(true);
+      return { status: error?.status || 500, data: error?.response || {} };
     } finally {
       setLoading(false);
     }
@@ -76,13 +83,13 @@ const Register = () => {
     setLoading(true);
     setMessage("");
     try {
-      const res = await POST("/auth/resend-otp-register", { email });
-      console.log("📥 Resend OTP response:", res);
+      const res = await POST("/auth/resend-otp-register", "", { email });
+      console.log("Resend OTP response:", res);
 
       setMessage(res.message || "OTP resent!");
     } catch (err: any) {
-      console.error("💥 Resend OTP error:", err);
-      setMessage(err?.message || "Failed to resend OTP");
+      console.error("Resend OTP error:", err);
+      setMessage(err.message || "Failed to resend OTP");
     } finally {
       setLoading(false);
     }
@@ -172,6 +179,16 @@ const Register = () => {
         onResend={handleResendOtp}
         loading={loading}
         message={message}
+      />
+      <CreatedUserModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          navigate("/login");
+        }}
+        onContinue={() => navigate("/login")}
+        email={email}
+        message={successMessage}
       />
     </div>
   );
