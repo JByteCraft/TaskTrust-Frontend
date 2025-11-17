@@ -14,13 +14,23 @@ import CreateJob from "./pages/CreateJobPage/CreateJob";
 import JobDetails from "./pages/JobDetailsPage/JobDetails";
 import MyJobs from "./pages/MyJobsPage/MyJobs";
 import MyApplications from "./pages/MyApplicationsPage/MyApplications";
+import PostsFeed from "./pages/PostsFeedPage/PostsFeed";
+import Connections from "./pages/ConnectionsPage/Connections";
+import Notifications from "./pages/NotificationsPage/Notifications";
+import Messages from "./pages/MessagesPage/Messages";
+import ForgotPassword from "./pages/ForgotPasswordPage/ForgotPassword";
+import ResetPassword from "./pages/ResetPasswordPage/ResetPassword";
 import GuestRoute from "./routes/GuestRoute";
 import Navbar from "./components/Navbar";
 
 const AppShell = () => {
   const location = useLocation();
   const pathname = location.pathname.toLowerCase();
-  const hideNavbar = pathname === "/login" || pathname === "/register";
+  const hideNavbar =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -28,6 +38,10 @@ const AppShell = () => {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/feed" element={<PostsFeed />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/users" element={<BrowseUsers />} />
           <Route path="/users/:userId" element={<Profile />} />
@@ -49,6 +63,22 @@ const AppShell = () => {
             element={
               <GuestRoute>
                 <Register />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <GuestRoute>
+                <ForgotPassword />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <GuestRoute>
+                <ResetPassword />
               </GuestRoute>
             }
           />

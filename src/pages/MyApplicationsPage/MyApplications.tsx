@@ -35,7 +35,7 @@ const MyApplications = () => {
   // Check if user is tasker
   if (user?.role !== "tasker" && user?.role !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-200 via-white to-blue-200">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600 mb-4">Only taskers can view their applications.</p>
@@ -58,7 +58,9 @@ const MyApplications = () => {
       try {
         setLoading(true);
         const response = await getMyApplications();
-        const appsData = response?.data?.data || response?.data || [];
+        // Backend returns: { status: 200, response: [...], message: '...' }
+        // axios returns: { data: { status, response, message } }
+        const appsData = response?.data?.response || response?.data?.data || response?.data || [];
         const apps = Array.isArray(appsData) ? appsData : [];
         setApplications(apps);
 
@@ -67,7 +69,8 @@ const MyApplications = () => {
         for (const app of apps) {
           try {
             const jobResponse = await getJob(app.jobId);
-            const jobData = jobResponse?.data?.data || jobResponse?.data;
+            // Backend returns: { status: 200, response: {...}, message: '...' }
+            const jobData = jobResponse?.data?.response || jobResponse?.data?.data || jobResponse?.data;
             if (jobData) {
               jobsMap[app.jobId] = jobData;
             }
@@ -155,16 +158,16 @@ const MyApplications = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
-          <p className="text-gray-600">Track your job applications</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
+          <p className="text-sm sm:text-base text-gray-600">Track your job applications</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="text-2xl font-bold text-gray-900">{applications.length}</div>
             <div className="text-sm text-gray-600">Total Applications</div>
@@ -185,11 +188,11 @@ const MyApplications = () => {
 
         {/* Applications List */}
         {applications.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <p className="text-gray-500 text-lg mb-4">You haven't applied to any jobs yet</p>
+          <div className="bg-white rounded-lg shadow-sm p-8 sm:p-12 text-center">
+            <p className="text-gray-500 text-base sm:text-lg mb-4">You haven't applied to any jobs yet</p>
             <Link
               to="/jobs"
-              className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition"
+              className="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
             >
               Browse Jobs
             </Link>
@@ -201,12 +204,12 @@ const MyApplications = () => {
               return (
                 <div
                   key={app.applicationId}
-                  className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+                  className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">
+                  <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+                    <div className="flex-1 w-full">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
                           {job?.title || `Job #${app.jobId}`}
                         </h3>
                         <span
@@ -250,10 +253,10 @@ const MyApplications = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-gray-200">
                     <Link
                       to={`/jobs/${app.jobId}`}
-                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                      className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
                     >
                       <FiEye />
                       View Job
@@ -262,14 +265,14 @@ const MyApplications = () => {
                       <button
                         onClick={() => handleWithdraw(app.applicationId)}
                         disabled={withdrawing === app.applicationId}
-                        className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50 text-sm"
                       >
                         <FiX />
                         {withdrawing === app.applicationId ? "Withdrawing..." : "Withdraw"}
                       </button>
                     )}
                     {app.status === "accepted" && (
-                      <span className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg">
+                      <span className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm">
                         <FiCheckCircle />
                         Application Accepted!
                       </span>

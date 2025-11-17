@@ -15,7 +15,7 @@ interface EditProfileModalProps {
     email: string;
     phoneNumber?: string;
     dateOfBirth?: string;
-    profession?: string;
+    expertise?: string;
     bio?: string;
     skills?: string[];
     street?: string;
@@ -29,6 +29,7 @@ interface EditProfileModalProps {
     idImgUrl?: string;
     selfieImgUrl?: string;
   };
+  userRole?: string; // User role to determine if skills should be shown
   loading?: boolean;
 }
 
@@ -37,8 +38,10 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
   onClose,
   onSave,
   initialData,
+  userRole,
   loading = false,
 }) => {
+  const isTasker = userRole === "tasker";
   const [formData, setFormData] = useState(initialData);
   const [skillInput, setSkillInput] = useState("");
 
@@ -74,7 +77,11 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSave(formData);
+    // Remove skills from formData if user is not a tasker
+    const dataToSave = isTasker 
+      ? formData 
+      : { ...formData, skills: undefined };
+    await onSave(dataToSave);
   };
 
   return (
@@ -210,20 +217,20 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Profession
+                    Expertise
                   </label>
                   <input
                     type="text"
-                    name="profession"
-                    value={formData.profession || ""}
+                    name="expertise"
+                    value={formData.expertise || ""}
                     onChange={handleChange}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    placeholder="e.g. Plumber, Electrician, Carpenter"
+                    placeholder="e.g. Web Development, Graphic Design, Plumbing"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Bio
+                    Professional Summary
                   </label>
                   <textarea
                     name="bio"
@@ -234,53 +241,56 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
                     placeholder="Tell others about yourself and your expertise..."
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Skills
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={skillInput}
-                      onChange={(e) => setSkillInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddSkill();
-                        }
-                      }}
-                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                      placeholder="Add a skill (press Enter)"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddSkill}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formData.skills && formData.skills.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {formData.skills.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSkill(index)}
-                            className="ml-1 rounded-full p-0.5 hover:bg-blue-200"
-                            aria-label={`Remove ${skill}`}
-                          >
-                            <FiX className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
+                {/* Skills - Only for Taskers */}
+                {isTasker && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Skills
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={skillInput}
+                        onChange={(e) => setSkillInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddSkill();
+                          }
+                        }}
+                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder="Add a skill (press Enter)"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSkill}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
                     </div>
-                  )}
-                </div>
+                    {formData.skills && formData.skills.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {formData.skills.map((skill, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
+                          >
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSkill(index)}
+                              className="ml-1 rounded-full p-0.5 hover:bg-blue-200"
+                              aria-label={`Remove ${skill}`}
+                            >
+                              <FiX className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -356,7 +366,7 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
             {/* Verification Information (for Taskers) */}
             <div>
               <h3 className="mb-4 text-lg font-semibold text-gray-900">
-                Verification (Optional)
+                Verification
               </h3>
               <p className="mb-4 text-sm text-gray-600">
                 For taskers: Upload your ID and selfie to get verified and build trust with customers

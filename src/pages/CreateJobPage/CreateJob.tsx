@@ -23,7 +23,7 @@ const CreateJob = () => {
   // Check if user is customer
   if (user?.role !== "customer" && user?.role !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-200 via-white to-blue-200">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600">Only customers can create jobs.</p>
@@ -83,10 +83,10 @@ const CreateJob = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Create New Job</h1>
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Create New Job</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Title */}
@@ -139,7 +139,7 @@ const CreateJob = () => {
             </div>
 
             {/* Location */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   City
@@ -187,7 +187,7 @@ const CreateJob = () => {
             </div>
 
             {/* Job Type & Estimated Hours */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Job Type
@@ -235,18 +235,18 @@ const CreateJob = () => {
             </div>
 
             {/* Buttons */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
               >
                 {loading ? "Creating..." : "Create Job"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/jobs")}
-                className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition"
+                className="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition text-sm sm:text-base"
               >
                 Cancel
               </button>

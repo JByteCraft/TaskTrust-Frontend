@@ -3,7 +3,7 @@ import axios, { type AxiosResponse } from "axios";
 import { API_BASE_URL } from "../api/config";
 
 const API = axios.create({
-  baseURL: API_BASE_URL || "http://localhost:4444",
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -35,12 +35,23 @@ export const POST = async <T = any>(
   token?: string
 ): Promise<T> => {
   try {
+    if (!API_BASE_URL) {
+      console.error("API_BASE_URL is not configured");
+      return { status: 500, message: "API base URL is not configured" } as T;
+    }
     const response: AxiosResponse<T> = await API.post(`${url}${params}`, body, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     return response.data;
   } catch (error: any) {
     console.error("POST request error:", error);
+    console.error("Request URL:", `${API_BASE_URL}${url}${params}`);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
     return (
       error.response?.data || { status: 500, message: "POST request failed" }
     );

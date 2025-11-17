@@ -54,31 +54,51 @@ const JobDetails = () => {
       try {
         setLoading(true);
         const response = await getJob(Number(jobId));
-        const jobData = response?.data?.data || response?.data;
-        setJob(jobData);
-
-        // If tasker, get match percentage
-        if (isTasker && user?.userId) {
-          try {
-            const matchResponse = await getMatchPercentage(
-              Number(jobId),
-              user.userId
-            );
-            setMatchPercentage(matchResponse?.data?.data?.matchPercentage || null);
-          } catch (err) {
-            console.error("Match calculation error:", err);
+        
+        // Extract job data from various response structures
+        let jobData: any = null;
+        if (response?.data) {
+          if (response.data.response && typeof response.data.response === 'object') {
+            jobData = response.data.response;
+          } else if (response.data.data && typeof response.data.data === 'object') {
+            jobData = response.data.data;
+          } else if (typeof response.data === 'object' && response.data.jobId) {
+            jobData = response.data;
           }
         }
-
-        // If owner, get applications
-        if (isOwner) {
-          try {
-            const appsResponse = await getJobApplications(Number(jobId));
-            const appsData = appsResponse?.data?.data || appsResponse?.data || [];
-            setApplications(Array.isArray(appsData) ? appsData : []);
-          } catch (err) {
-            console.error("Fetch applications error:", err);
+        
+        if (jobData && jobData.jobId) {
+          setJob(jobData);
+          
+          // If tasker, get match percentage
+          if (isTasker && user?.userId) {
+            try {
+              const matchResponse = await getMatchPercentage(
+                Number(jobId),
+                user.userId
+              );
+              // Backend returns: { status: 200, response: { matchPercentage }, message: '...' }
+              const matchData = matchResponse?.data?.response || matchResponse?.data?.data || matchResponse?.data;
+              setMatchPercentage(matchData?.matchPercentage || null);
+            } catch (err) {
+              console.error("Match calculation error:", err);
+            }
           }
+
+          // If owner, get applications
+          const isOwner = jobData.customerId === user?.userId;
+          if (isOwner) {
+            try {
+              const appsResponse = await getJobApplications(Number(jobId));
+              // Backend returns: { status: 200, response: [...], message: '...' }
+              const appsData = appsResponse?.data?.response || appsResponse?.data?.data || appsResponse?.data || [];
+              setApplications(Array.isArray(appsData) ? appsData : []);
+            } catch (err) {
+              console.error("Fetch applications error:", err);
+            }
+          }
+        } else {
+          console.error("Job not found or invalid response:", response);
         }
       } catch (error: any) {
         console.error("Fetch job error:", error);
@@ -90,7 +110,7 @@ const JobDetails = () => {
     if (jobId) {
       fetchJob();
     }
-  }, [jobId, navigate, isTasker, isOwner, user]);
+  }, [jobId, navigate, isTasker, user?.userId]);
 
   const handleApply = async () => {
     if (!job || !user) return;
@@ -123,7 +143,8 @@ const JobDetails = () => {
     if (!jobId) return;
     try {
       const response = await getJobMatches(Number(jobId));
-      const matchesData = response?.data?.data || response?.data || [];
+      // Backend returns: { status: 200, response: [...], message: '...' }
+      const matchesData = response?.data?.response || response?.data?.data || response?.data || [];
       setMatches(Array.isArray(matchesData) ? matchesData : []);
       setShowMatches(true);
     } catch (error) {
@@ -153,15 +174,15 @@ const JobDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+            <div className="flex-1 w-full">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-gray-600">
+                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
                   job.status === "open" ? "bg-green-100 text-green-800" :
                   job.status === "in_progress" ? "bg-blue-100 text-blue-800" :
                   job.status === "completed" ? "bg-gray-100 text-gray-800" :
@@ -170,7 +191,7 @@ const JobDetails = () => {
                   {job.status.replace("_", " ").toUpperCase()}
                 </span>
                 {matchPercentage !== null && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {matchPercentage}% Match
                   </span>
                 )}
@@ -179,14 +200,14 @@ const JobDetails = () => {
             {isOwner && (
               <Link
                 to={`/jobs/${job.jobId}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-center text-sm"
               >
                 Edit
               </Link>
             )}
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-4">
             <div className="flex items-center gap-2 text-gray-600">
               <FiDollarSign />
               <span className="font-semibold text-gray-900">₱{job.budget.toLocaleString()}</span>
@@ -212,19 +233,19 @@ const JobDetails = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Description */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Description</h2>
               <p className="text-gray-700 whitespace-pre-wrap">{job.description}</p>
             </div>
 
             {/* Required Skills */}
             {job.requiredSkills && job.requiredSkills.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Required Skills</h2>
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Required Skills</h2>
                 <div className="flex flex-wrap gap-2">
                   {job.requiredSkills.map((skill, idx) => (
                     <span
@@ -240,17 +261,17 @@ const JobDetails = () => {
 
             {/* Application Form (Tasker) */}
             {isTasker && job.status === "open" && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
                 {!showApplicationForm ? (
                   <button
                     onClick={() => setShowApplicationForm(true)}
-                    className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition"
+                    className="w-full bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
                   >
                     Apply for this Job
                   </button>
                 ) : (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Submit Application</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Submit Application</h3>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Cover Letter (Optional)
@@ -279,11 +300,11 @@ const JobDetails = () => {
                         placeholder="Leave empty to use job budget"
                       />
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       <button
                         onClick={handleApply}
                         disabled={applying}
-                        className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+                        className="flex-1 bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 text-sm sm:text-base"
                       >
                         {applying ? "Submitting..." : "Submit Application"}
                       </button>
@@ -292,7 +313,7 @@ const JobDetails = () => {
                           setShowApplicationForm(false);
                           setApplicationData({ coverLetter: "", proposedBudget: "" });
                         }}
-                        className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base"
                       >
                         Cancel
                       </button>
@@ -304,10 +325,10 @@ const JobDetails = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Job Info Card */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h3>
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Job Details</h3>
               <div className="space-y-3 text-sm">
                 <div>
                   <span className="text-gray-600">Status:</span>
@@ -336,17 +357,17 @@ const JobDetails = () => {
 
             {/* Actions (Owner) */}
             {isOwner && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Actions</h3>
                 <button
                   onClick={handleViewMatches}
-                  className="w-full mb-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                  className="w-full mb-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
                 >
                   View Matched Taskers
                 </button>
                 <Link
                   to={`/jobs/${job.jobId}/applications`}
-                  className="block w-full text-center border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+                  className="block w-full text-center border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm sm:text-base"
                 >
                   View Applications ({applications.length})
                 </Link>
@@ -357,10 +378,10 @@ const JobDetails = () => {
 
         {/* Matches Modal */}
         {showMatches && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Matched Taskers</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Matched Taskers</h2>
                 <button
                   onClick={() => setShowMatches(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -382,7 +403,7 @@ const JobDetails = () => {
                           <h3 className="font-semibold text-gray-900">
                             {match.tasker?.firstName} {match.tasker?.lastName}
                           </h3>
-                          <p className="text-sm text-gray-600">{match.tasker?.profession}</p>
+                          <p className="text-sm text-gray-600">{match.tasker?.expertise}</p>
                         </div>
                         <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                           {match.matchPercentage}% Match

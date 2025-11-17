@@ -39,8 +39,12 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
   });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+  // Password: at least 8 chars, at least 1 uppercase, at least 1 symbol
+  // Uses positive lookaheads to check for requirements, then allows any characters
+  const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
   const validate = (data: RegisterFormData) => {
     const validationErrors = {
@@ -92,7 +96,9 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
     setFormData({ ...formData, role });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return; // Prevent multiple submissions
+    
     setSubmitted(true);
     const validationErrors = validate(formData);
     setErrors(validationErrors);
@@ -103,8 +109,19 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
     if (hasErrors) {
       return;
     }
-    const { confirmPassword, ...payload } = formData;
-    onShowOTP(payload);
+
+    if (!termsAccepted) {
+      alert("Please accept the Terms of Service and Privacy Policy to continue");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { confirmPassword, ...payload } = formData;
+      await onShowOTP(payload);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const shouldShowEmailError =
@@ -366,25 +383,21 @@ const RegisterForm = ({ onShowOTP }: { onShowOTP: (data: any) => void }) => {
           <input
             type="checkbox"
             id="terms"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
           />
           <label className="ml-2 text-sm text-gray-600" htmlFor="terms">
-            I agree to the{" "}
-            <a href="#" className="text-blue-600 hover:underline font-medium">
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href="#" className="text-blue-600 hover:underline font-medium">
-              Privacy Policy
-            </a>
+            I agree to the Terms of Service and Privacy Policy
           </label>
         </div>
 
         <button
           onClick={handleSubmit}
-          className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition"
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Create Account
+          {isSubmitting ? "Creating Account..." : "Create Account"}
         </button>
       </div>
 

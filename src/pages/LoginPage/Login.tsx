@@ -43,17 +43,27 @@ const Login = () => {
     setLoading(true);
     setMessage("");
     try {
+      console.log("Attempting login for:", email);
       const res = await POST("/auth/login", "", { email, password });
       console.log("Login response:", res);
 
+      // Check if response indicates success
       const isSuccess =
         res?.status === 200 ||
         res?.status === 201 ||
         res?.success === true ||
-        !!res?.token;
+        !!res?.token ||
+        !!res?.accessToken ||
+        !!res?.data?.token ||
+        !!res?.data?.accessToken ||
+        !!res?.response?.token ||
+        !!res?.response?.accessToken;
 
       if (!isSuccess) {
-        setMessage(res?.message || "Login failed. Please try again.");
+        const errorMessage = res?.message || res?.error || "Login failed. Please try again.";
+        console.error("Login failed:", errorMessage, res);
+        setMessage(errorMessage);
+        setLoading(false);
         return;
       }
 
@@ -64,12 +74,15 @@ const Login = () => {
         setMessage(
           "Login successful but token was not provided. Please contact support."
         );
+        setLoading(false);
         return;
       }
 
       persistAuthToken(token, rememberMe);
       setMessage(res?.message || "Login successful!");
-      navigate("/");
+      setTimeout(() => {
+        navigate("/");
+      }, 500);
     } catch (error: any) {
       console.error("Login error:", error);
       const apiMessage =
@@ -77,7 +90,6 @@ const Login = () => {
         error?.message ||
         "Login failed. Please try again.";
       setMessage(apiMessage);
-    } finally {
       setLoading(false);
     }
   };
@@ -224,16 +236,6 @@ const Login = () => {
               onSubmit={handleLogin}
             />
           </div>
-          <p className="text-center text-xs text-gray-500 mt-6">
-            By signing in, you agree to our{" "}
-            <a href="#" className="text-blue-600 hover:underline">
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href="#" className="text-blue-600 hover:underline">
-              Privacy Policy
-            </a>
-          </p>
         </div>
       </div>
     </div>

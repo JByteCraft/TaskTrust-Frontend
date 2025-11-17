@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiSearch,
@@ -10,21 +10,29 @@ import {
   FiBriefcase,
   FiBell,
   FiChevronDown,
+  FiLogOut,
 } from "react-icons/fi";
-import { getAuthenticatedUserFromToken, getStoredAuthToken } from "../lib/utils/auth.utils";
+import { getAuthenticatedUserFromToken, getStoredAuthToken, clearStoredAuthToken } from "../lib/utils/auth.utils";
 import { GET } from "../lib/utils/fetch.utils";
+import NotificationsDropdown from "./NotificationsDropdown";
+import { getNotifications } from "../lib/api/notifications.api";
 
 const navItems = [
   { icon: FiHome, label: "Home", path: "/" },
   { icon: FiUser, label: "Profile", path: "/profile" },
-  { icon: FiMessageCircle, label: "Messaging", path: "/messages" },
-  { icon: FiUsers, label: "Network", path: "/users" },
+  { icon: FiMessageCircle, label: "Feed", path: "/feed" },
+  { icon: FiUsers, label: "Network", path: "/connections" },
   { icon: FiBriefcase, label: "Jobs", path: "/jobs" },
+  { icon: FiMessageCircle, label: "Messages", path: "/messages" },
 ];
 
 const Navbar: FC = () => {
   const navigate = useNavigate();
   const [profilePictureUrl, setProfilePictureUrl] = useState<string>("");
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   const authUser = getAuthenticatedUserFromToken<{
     firstName?: string;
@@ -73,6 +81,52 @@ const Navbar: FC = () => {
     fetchUserProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load unread notification count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      const token = getStoredAuthToken();
+      if (!token) return;
+
+      try {
+        const response = await getNotifications();
+        const data = response?.data?.data || response?.data || {};
+        setUnreadCount(data.unreadCount || 0);
+      } catch (error) {
+        console.error("Load unread count error:", error);
+      }
+    };
+
+    loadUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  const handleLogout = () => {
+    clearStoredAuthToken();
+    navigate("/login");
+  };
 
   const displayName = useMemo(() => {
     if (!authUser) {
@@ -169,19 +223,43 @@ const Navbar: FC = () => {
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            className="relative flex h-9 w-9 sm:h-10 sm:w-10 flex-none items-center justify-center rounded-full text-blue-500 transition hover:bg-blue-50 hover:text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:bg-blue-100"
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <FiBell className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            <span className="sr-only">Notifications</span>
-          </button>
-          <div className="flex flex-none items-center">
+          <div className="relative">
             <button
               type="button"
-              onClick={() => navigate("/profile")}
+              onClick={() => {
+                // On mobile, navigate to notifications page
+                // On desktop, show dropdown
+                if (window.innerWidth < 640) {
+                  navigate("/notifications");
+                } else {
+                  setShowNotifications(!showNotifications);
+                }
+              }}
+              className="relative flex h-9 w-9 sm:h-10 sm:w-10 flex-none items-center justify-center rounded-full text-blue-500 transition hover:bg-blue-50 hover:text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:bg-blue-100"
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              <FiBell className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+              <span className="sr-only">Notifications</span>
+            </button>
+            {/* Only show dropdown on desktop (sm and above) */}
+            <div className="hidden sm:block">
+              <NotificationsDropdown
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
+                onUnreadCountChange={setUnreadCount}
+              />
+            </div>
+          </div>
+          <div className="relative flex flex-none items-center" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50/60 px-2 py-1.5 sm:px-3 text-xs sm:text-sm font-medium text-blue-600 transition hover:border-blue-200 hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:bg-blue-100"
             >
               <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center overflow-hidden rounded-full bg-blue-200">
@@ -200,6 +278,31 @@ const Navbar: FC = () => {
               <span className="hidden sm:inline">{displayName}</span>
               <FiChevronDown className="h-3 w-3 sm:h-4 sm:w-4 hidden sm:block" aria-hidden="true" />
             </button>
+            
+            {/* User Menu Dropdown */}
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate("/profile");
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  <FiUser className="h-4 w-4 text-gray-500" />
+                  <span>View Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition"
+                >
+                  <FiLogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
           </div>
         </nav>
       </div>

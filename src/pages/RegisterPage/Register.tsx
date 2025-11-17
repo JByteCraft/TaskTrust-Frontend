@@ -19,6 +19,8 @@ const Register = () => {
 
   const handleRegister = async (data: any) => {
     console.log("handleRegister called with:", data);
+    if (loading) return; // Prevent multiple calls
+    
     setLoading(true);
     setMessage("");
     try {

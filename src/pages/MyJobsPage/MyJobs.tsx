@@ -34,7 +34,7 @@ const MyJobs = () => {
   // Check if user is customer
   if (user?.role !== "customer" && user?.role !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-200 via-white to-blue-200">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600 mb-4">Only customers can view their jobs.</p>
@@ -57,7 +57,21 @@ const MyJobs = () => {
       try {
         setLoading(true);
         const response = await getMyJobs();
-        const jobsData = response?.data?.data || response?.data || [];
+        console.log("MyJobs API Response:", response?.data);
+        
+        // Backend returns: { status: 200, response: jobs, message: '...' }
+        let jobsData: any[] = [];
+        if (response?.data) {
+          if (response.data.response && Array.isArray(response.data.response)) {
+            jobsData = response.data.response;
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            jobsData = response.data.data;
+          } else if (Array.isArray(response.data)) {
+            jobsData = response.data;
+          }
+        }
+        
+        console.log("MyJobs Extracted jobs:", jobsData);
         setJobs(Array.isArray(jobsData) ? jobsData : []);
 
         // Fetch application counts for each job
@@ -65,7 +79,8 @@ const MyJobs = () => {
         for (const job of Array.isArray(jobsData) ? jobsData : []) {
           try {
             const appsResponse = await getJobApplications(job.jobId);
-            const apps = appsResponse?.data?.data || appsResponse?.data || [];
+            // Backend returns: { status: 200, response: [...], message: '...' }
+            const apps = appsResponse?.data?.response || appsResponse?.data?.data || appsResponse?.data || [];
             counts[job.jobId] = Array.isArray(apps) ? apps.length : 0;
           } catch (err) {
             counts[job.jobId] = 0;
@@ -130,17 +145,17 @@ const MyJobs = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">My Jobs</h1>
-            <p className="text-gray-600">Manage your posted jobs</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Jobs</h1>
+            <p className="text-sm sm:text-base text-gray-600">Manage your posted jobs</p>
           </div>
           <Link
             to="/jobs/create"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition"
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-center text-sm sm:text-base"
           >
             + Create New Job
           </Link>
@@ -148,11 +163,11 @@ const MyJobs = () => {
 
         {/* Jobs List */}
         {jobs.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <p className="text-gray-500 text-lg mb-4">You haven't posted any jobs yet</p>
+          <div className="bg-white rounded-lg shadow-sm p-8 sm:p-12 text-center">
+            <p className="text-gray-500 text-base sm:text-lg mb-4">You haven't posted any jobs yet</p>
             <Link
               to="/jobs/create"
-              className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition"
+              className="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
             >
               Create Your First Job
             </Link>
@@ -162,12 +177,12 @@ const MyJobs = () => {
             {jobs.map((job) => (
               <div
                 key={job.jobId}
-                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+                className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold text-gray-900">{job.title}</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{job.title}</h3>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
                           job.status
@@ -233,17 +248,17 @@ const MyJobs = () => {
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-gray-200">
                   <Link
                     to={`/jobs/${job.jobId}`}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
                   >
                     <FiEye />
                     View Details
                   </Link>
                   <Link
                     to={`/jobs/${job.jobId}/applications`}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
                   >
                     <FiUsers />
                     Applications ({applicationCounts[job.jobId] || 0})
@@ -252,7 +267,7 @@ const MyJobs = () => {
                     <>
                       <Link
                         to={`/jobs/${job.jobId}/edit`}
-                        className="flex items-center gap-2 px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition text-sm"
                       >
                         <FiEdit />
                         Edit
@@ -260,7 +275,7 @@ const MyJobs = () => {
                       <button
                         onClick={() => handleDelete(job.jobId)}
                         disabled={deleting === job.jobId}
-                        className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50 text-sm"
                       >
                         <FiTrash2 />
                         {deleting === job.jobId ? "Deleting..." : "Delete"}

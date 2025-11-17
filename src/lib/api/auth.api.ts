@@ -17,3 +17,14 @@ export const verifyOtp = async (email: string, otp: string, userData: any) => {
     userData,
   });
 };
+
+export const forgotPassword = async (email: string) => {
+  return axios.post(`${API_BASE_URL}/auth/forgot-password`, { email });
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  return axios.post(`${API_BASE_URL}/auth/reset-password`, {
+    token,
+    newPassword,
+  });
+};

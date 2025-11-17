@@ -24,7 +24,7 @@ const ProfileCard: FC<ProfileCardProps> = ({
             <p className="text-xs text-gray-500 sm:text-sm">{description}</p>
           )}
         </div>
-        {action && <div className="w-full flex-shrink-0 sm:w-auto">{action}</div>}
+        {action && <div className="w-full shrink-0 sm:w-auto">{action}</div>}
       </header>
       <div className="px-4 py-4 sm:px-6 sm:py-6">{children}</div>
     </section>
