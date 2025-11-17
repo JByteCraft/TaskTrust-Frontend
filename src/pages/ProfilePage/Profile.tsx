@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import ProfileHero, {
   type ProfileStats,
 } from "./components/ProfileHero";
@@ -11,6 +11,8 @@ import UploadCoverModal from "./components/UploadCoverModal";
 import PortfolioModal from "./components/PortfolioModal";
 import ReviewsSection from "./components/ReviewsSection";
 import CreateReviewModal from "./components/CreateReviewModal";
+import ScheduleModal from "./components/ScheduleModal";
+import EducationModal from "./components/EducationModal";
 import CreatePost from "../../components/CreatePost";
 import PostCard from "../../components/PostCard";
 import { GET, PATCH } from "../../lib/utils/fetch.utils";
@@ -25,6 +27,14 @@ import {
   updatePortfolioItem,
   deletePortfolioItem,
 } from "../../lib/api/portfolio.api";
+import { getApplications } from "../../lib/api/applications.api";
+import { getJob } from "../../lib/api/jobs.api";
+import {
+  getEducationRecords,
+  createEducationRecord,
+  updateEducationRecord,
+  deleteEducationRecord,
+} from "../../lib/api/education.api";
 
 type ProfileData = {
   name: string;
@@ -52,6 +62,7 @@ const DEFAULT_PROFILE: ProfileData = {
 
 const Profile = () => {
   const { userId: urlUserId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData>(DEFAULT_PROFILE);
   const [rawUserData, setRawUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -62,14 +73,21 @@ const Profile = () => {
   const [showUploadCoverModal, setShowUploadCoverModal] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showCreateReviewModal, setShowCreateReviewModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showEducationModal, setShowEducationModal] = useState(false);
   const [editingPortfolioItem, setEditingPortfolioItem] = useState<any>(null);
+  const [editingEducationItem, setEditingEducationItem] = useState<any>(null);
   const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
+  const [platformProjects, setPlatformProjects] = useState<any[]>([]);
+  const [educationItems, setEducationItems] = useState<any[]>([]);
+  const [scheduleData, setScheduleData] = useState<any>(null);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
   const [postUsers, setPostUsers] = useState<{ [key: number]: any }>({});
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Get current user info
   const authPayload = getAuthenticatedUserFromToken<{
@@ -175,9 +193,9 @@ const Profile = () => {
           payload?.name ||
           DEFAULT_PROFILE.name;
 
+        // Always use the payload role first (the viewed user's role), not the logged-in user's role
         const resolvedRole =
           payload?.role ||
-          authPayload?.role ||
           payload?.userRole ||
           payload?.user?.role ||
           payload?.roles?.[0] ||
@@ -248,8 +266,13 @@ const Profile = () => {
     if (targetUserId && !Number.isNaN(Number(targetUserId))) {
       loadUserPosts();
       loadPortfolioItems();
+      loadPlatformProjects();
+      loadEducationItems();
+      if (isViewingOwnProfile) {
+        loadSchedule();
+      }
     }
-  }, [targetUserId]);
+  }, [targetUserId, isViewingOwnProfile]);
 
   const loadUserPosts = async () => {
     if (!targetUserId || Number.isNaN(Number(targetUserId))) return;
@@ -358,11 +381,71 @@ const Profile = () => {
         items = response.data;
       }
       
-      setPortfolioItems(Array.isArray(items) ? items : []);
+      // Filter out platform projects (they'll be loaded separately)
+      const externalItems = Array.isArray(items) 
+        ? items.filter((item: any) => item.source !== 'platform')
+        : [];
+      
+      setPortfolioItems(externalItems);
     } catch (error) {
       console.error("Load portfolio items error:", error);
     } finally {
       setLoadingPortfolio(false);
+    }
+  };
+
+  const loadPlatformProjects = async () => {
+    if (!targetUserId || Number.isNaN(Number(targetUserId))) return;
+    
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    try {
+      // Get accepted applications for this user
+      // axios returns: { data: { status, response, message } }
+      const appsResponse = await getApplications({ taskerId: targetUserId, status: 'accepted' });
+      let appsData: any[] = [];
+      if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+        appsData = appsResponse.data.response;
+      } else if (Array.isArray(appsResponse?.data)) {
+        appsData = appsResponse.data;
+      }
+      const acceptedApps = appsData;
+
+      // Get job details for each accepted application
+      const platformProjectsList: any[] = [];
+      for (const app of acceptedApps) {
+        try {
+          const jobResponse = await getJob(app.jobId);
+          // axios returns: { data: { status, response, message } }
+          let jobData: any = null;
+          if (jobResponse?.data?.response && typeof jobResponse.data.response === 'object') {
+            jobData = jobResponse.data.response;
+          } else if (jobResponse?.data && typeof jobResponse.data === 'object' && jobResponse.data.jobId) {
+            jobData = jobResponse.data;
+          }
+          if (jobData && (jobData.status === 'completed' || jobData.status === 'in_progress')) {
+            platformProjectsList.push({
+              portfolioId: `platform-${app.jobId}`,
+              type: 'project',
+              source: 'platform',
+              jobId: app.jobId,
+              title: jobData.title || `Job #${app.jobId}`,
+              description: jobData.description,
+              company: jobData.customerId ? 'Client' : undefined,
+              dateStarted: jobData.createdAt,
+              dateEnd: jobData.status === 'completed' ? jobData.updatedAt : undefined,
+              skills: jobData.requiredSkills || [],
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to fetch job ${app.jobId}:`, err);
+        }
+      }
+
+      setPlatformProjects(platformProjectsList);
+    } catch (error) {
+      console.error("Load platform projects error:", error);
     }
   };
 
@@ -405,6 +488,77 @@ const Profile = () => {
   const handleAddPortfolio = () => {
     setEditingPortfolioItem(null);
     setShowPortfolioModal(true);
+  };
+
+  const loadEducationItems = async () => {
+    if (!targetUserId || Number.isNaN(Number(targetUserId))) return;
+    
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    try {
+      const response = await getEducationRecords(targetUserId);
+      // fetch.utils returns: { status, response, message }
+      // For education: response.response = { educations: [...] }
+      let items: any[] = [];
+      
+      if (response?.response?.educations) {
+        items = response.response.educations;
+      } else if (response?.data?.educations) {
+        items = response.data.educations;
+      } else if (Array.isArray(response?.response)) {
+        items = response.response;
+      } else if (Array.isArray(response?.data)) {
+        items = response.data;
+      } else if (Array.isArray(response)) {
+        items = response;
+      }
+      
+      setEducationItems(items || []);
+    } catch (error: any) {
+      console.error("Load education error:", error);
+    }
+  };
+
+  const handleSaveEducation = async () => {
+    // EducationModal handles the save internally, this is just a callback
+    await loadEducationItems();
+    setShowEducationModal(false);
+    setEditingEducationItem(null);
+  };
+
+  const handleDeleteEducation = async (educationId: number) => {
+    if (!confirm("Are you sure you want to delete this education record?")) return;
+    
+    try {
+      await deleteEducationRecord(educationId);
+      await loadEducationItems();
+    } catch (error: any) {
+      console.error("Delete education error:", error);
+      alert(error.response?.data?.message || "Failed to delete education record");
+    }
+  };
+
+  const handleEditEducation = (item: any) => {
+    setEditingEducationItem(item);
+    setShowEducationModal(true);
+  };
+
+  const handleAddEducation = () => {
+    setEditingEducationItem(null);
+    setShowEducationModal(true);
+  };
+
+  const loadSchedule = async () => {
+    try {
+      const { getSchedule } = await import("../../lib/api/schedule.api");
+      const response = await getSchedule();
+      const schedule =
+        response?.response || response?.data?.response || response?.data || response;
+      setScheduleData(schedule);
+    } catch (error) {
+      console.error("Load schedule error:", error);
+    }
   };
 
   const handleGenerateResume = async () => {
@@ -568,6 +722,53 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
     }
   };
 
+  const handleRemoveAvatar = async () => {
+    if (!confirm("Are you sure you want to remove your profile picture?")) return;
+    
+    try {
+      setUploading(true);
+      const token = getStoredAuthToken();
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const defaultAvatar = "https://www.dropbox.com/scl/fi/d7ioe7bosz1c5fiu2kmor/blank_avatar.svg?rlkey=d3ek8qx9pxle8alp09xgfs1zv&st=v41au8vj&raw=1";
+      await PATCH(`/users/${targetUserId}`, "", { profilePictureUrl: defaultAvatar }, token);
+      
+      // Refresh profile
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Remove avatar error:", error);
+      alert(error.response?.data?.message || "Failed to remove profile picture");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    if (!confirm("Are you sure you want to remove your cover photo?")) return;
+    
+    try {
+      setUploading(true);
+      const token = getStoredAuthToken();
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      await PATCH(`/users/${targetUserId}`, "", { coverPhotoUrl: "" }, token);
+      
+      // Refresh profile
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Remove cover error:", error);
+      alert(error.response?.data?.message || "Failed to remove cover photo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleUploadAvatar = async (avatarUrl: string) => {
     setUploading(true);
     const token = getStoredAuthToken();
@@ -682,6 +883,7 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
               coverUrl={profile.coverUrl}
               isLegit={rawUserData?.isLegit}
               onEditProfile={isViewingOwnProfile ? () => setShowEditModal(true) : undefined}
+              onMessage={!isViewingOwnProfile ? () => navigate("/messages") : undefined}
               onUploadAvatar={isViewingOwnProfile ? () => setShowUploadModal(true) : undefined}
               onUploadCover={isViewingOwnProfile ? () => setShowUploadCoverModal(true) : undefined}
               onGenerateResume={isViewingOwnProfile && rawUserData?.role === "tasker" ? handleGenerateResume : undefined}
@@ -691,9 +893,12 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
               <ProfileTabs
                 tabs={[
                   { id: "summary", label: "Summary" },
-                  { id: "schedule", label: "Schedule" },
-                  { id: "portfolio", label: "Portfolio" },
-                  { id: "reviews", label: "Reviews" },
+                  ...(rawUserData?.role?.toLowerCase() === "tasker" ? [
+                    { id: "schedule", label: "Schedule" },
+                    { id: "portfolio", label: "Portfolio" },
+                    { id: "education", label: "Education" },
+                    { id: "reviews", label: "Reviews" },
+                  ] : []),
                   { id: "posts", label: "Posts" },
                 ]}
                 activeTab={activeTab}
@@ -704,27 +909,30 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
             {/* Main Content: 2 Column Layout */}
             <div className="grid grid-cols-1 gap-0 lg:gap-6 lg:grid-cols-12">
                 {/* Left Sidebar - 30% (Desktop only) */}
-                <div className={`lg:col-span-4 space-y-4 ${activeTab !== "posts" && activeTab !== "summary" && activeTab !== "schedule" && activeTab !== "portfolio" && activeTab !== "reviews" ? "hidden lg:block" : ""}`}>
-                {/* Professional Summary */}
+                <div className={`lg:col-span-4 space-y-4 ${activeTab !== "posts" && activeTab !== "summary" && activeTab !== "schedule" && activeTab !== "portfolio" && activeTab !== "education" && activeTab !== "reviews" ? "hidden lg:block" : ""}`}>
+                {/* Professional Summary / Bio */}
                 <div className={activeTab === "summary" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
                   <ProfileCard
-                    title="Professional Summary"
-                    description="Your expertise and experience"
+                    title={rawUserData?.role?.toLowerCase() === "customer" ? "Bio" : "Professional Summary"}
+                    description={rawUserData?.role?.toLowerCase() === "customer" ? "About you" : "Your expertise and experience"}
                   >
                     <div className="space-y-3">
                       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
                         {profile.bio
                           ? profile.bio
+                          : rawUserData?.role?.toLowerCase() === "customer"
+                          ? "Add your bio to tell others about yourself."
                           : "Add your professional summary to showcase your skills and experience."}
                       </div>
                     </div>
                   </ProfileCard>
 
                   {/* Verification Status */}
-                  <ProfileCard
-                    title="Verification Status"
-                    description="ID verification information"
-                  >
+                  <div className="mt-4">
+                    <ProfileCard
+                      title="Verification Status"
+                      description="ID verification information"
+                    >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-700">Status:</span>
@@ -775,10 +983,12 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                       )}
                     </div>
                   </ProfileCard>
+                  </div>
                 </div>
 
-                {/* Schedule */}
-                <div className={activeTab === "schedule" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
+                {/* Schedule - Only for taskers */}
+                {rawUserData?.role?.toLowerCase() === "tasker" && (
+                  <div className={activeTab === "schedule" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
                   <ProfileCard
                     title="Schedule"
                     description="Your availability"
@@ -786,6 +996,7 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                       isViewingOwnProfile ? (
                         <button
                           type="button"
+                          onClick={() => setShowScheduleModal(true)}
                           className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50"
                         >
                           Manage
@@ -793,16 +1004,39 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                       ) : undefined
                     }
                   >
-                    <p className="text-sm text-gray-500">
-                      Update your weekly schedule so clients know when you&apos;re available.
-                    </p>
+                    {scheduleData ? (
+                      <div className="space-y-2">
+                        {Object.entries(scheduleData.weeklySchedule || {}).map(([day, daySchedule]: [string, any]) => {
+                          if (!daySchedule?.available) return null;
+                          return (
+                            <div key={day} className="flex items-center justify-between text-sm">
+                              <span className="font-medium text-gray-700 capitalize">{day}</span>
+                              <span className="text-gray-600">
+                                {daySchedule.startTime} - {daySchedule.endTime}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {Object.values(scheduleData.weeklySchedule || {}).every((ds: any) => !ds?.available) && (
+                          <p className="text-sm text-gray-500">
+                            No availability set. Click Manage to update your schedule.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        Update your weekly schedule so clients know when you&apos;re available.
+                      </p>
+                    )}
                   </ProfileCard>
-                </div>
+                  </div>
+                )}
 
-                {/* Portfolio */}
-                <div className={activeTab === "portfolio" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
-                  <ProfileCard
-                    title="Portfolio"
+                {/* Portfolio - Only for taskers */}
+                {rawUserData?.role?.toLowerCase() === "tasker" && (
+                  <div className={activeTab === "portfolio" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
+                    <ProfileCard
+                      title="Portfolio"
                     description="Certifications and projects"
                     action={
                       isViewingOwnProfile ? (
@@ -823,47 +1057,376 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                         No portfolio items yet
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {portfolioItems.map((item: any) => (
+                      <div className="space-y-6">
+                        {/* Platform Projects */}
+                        {platformProjects.filter((item: any) => {
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            item.title?.toLowerCase().includes(query) ||
+                            item.description?.toLowerCase().includes(query) ||
+                            item.company?.toLowerCase().includes(query) ||
+                            item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                          );
+                        }).length > 0 && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Platform Projects</h3>
+                            <div className="space-y-4 max-h-[480px] overflow-y-auto">
+                              {platformProjects
+                                .filter((item: any) => {
+                                  if (!searchQuery.trim()) return true;
+                                  const query = searchQuery.toLowerCase();
+                                  return (
+                                    item.title?.toLowerCase().includes(query) ||
+                                    item.description?.toLowerCase().includes(query) ||
+                                    item.company?.toLowerCase().includes(query) ||
+                                    item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                                  );
+                                })
+                                .map((item: any) => (
+                                  <div
+                                    key={item.portfolioId}
+                                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                                  >
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800">
+                                            Platform Project
+                                          </span>
+                                          <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                                        </div>
+                                        {item.description && (
+                                          <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                                        )}
+                                        {item.company && (
+                                          <p className="text-xs text-gray-500">Client: {item.company}</p>
+                                        )}
+                                        {item.dateStarted && (
+                                          <p className="text-xs text-gray-500">
+                                            Started: {new Date(item.dateStarted).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {item.dateEnd && (
+                                          <p className="text-xs text-gray-500">
+                                            Completed: {new Date(item.dateEnd).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {item.skills && item.skills.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-2">
+                                            {item.skills.map((skill: string, idx: number) => (
+                                              <span
+                                                key={idx}
+                                                className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded"
+                                              >
+                                                {skill}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* External Projects */}
+                        {portfolioItems.filter((item: any) => {
+                          if (item.type !== "project") return false;
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            item.title?.toLowerCase().includes(query) ||
+                            item.description?.toLowerCase().includes(query) ||
+                            item.company?.toLowerCase().includes(query) ||
+                            item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                          );
+                        }).length > 0 && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-3">External Projects</h3>
+                            <div className="space-y-4 max-h-[480px] overflow-y-auto">
+                              {portfolioItems
+                                .filter((item: any) => {
+                                  if (item.type !== "project") return false;
+                                  if (!searchQuery.trim()) return true;
+                                  const query = searchQuery.toLowerCase();
+                                  return (
+                                    item.title?.toLowerCase().includes(query) ||
+                                    item.description?.toLowerCase().includes(query) ||
+                                    item.company?.toLowerCase().includes(query) ||
+                                    item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                                  );
+                                })
+                                .map((item: any) => (
+                                  <div
+                                    key={item.portfolioId}
+                                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                                  >
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
+                                            Project
+                                          </span>
+                                          <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                                        </div>
+                                        {item.description && (
+                                          <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                                        )}
+                                        {item.company && (
+                                          <p className="text-xs text-gray-500">Client: {item.company}</p>
+                                        )}
+                                        {item.location && (
+                                          <p className="text-xs text-gray-500">Location: {item.location}</p>
+                                        )}
+                                        {item.dateStarted && (
+                                          <p className="text-xs text-gray-500">
+                                            Started: {new Date(item.dateStarted).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {item.dateEnd && (
+                                          <p className="text-xs text-gray-500">
+                                            Ended: {new Date(item.dateEnd).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {!item.dateStarted && !item.dateEnd && item.date && (
+                                          <p className="text-xs text-gray-500">
+                                            {new Date(item.date).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {item.skills && item.skills.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-2">
+                                            {item.skills.map((skill: string, idx: number) => (
+                                              <span
+                                                key={idx}
+                                                className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded"
+                                              >
+                                                {skill}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {isViewingOwnProfile && (
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEditPortfolio(item)}
+                                            className="text-blue-600 hover:text-blue-700 text-sm"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeletePortfolio(item.portfolioId)}
+                                            className="text-red-600 hover:text-red-700 text-sm"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {item.imageUrls && item.imageUrls.length > 0 && (
+                                      <div className="grid grid-cols-3 gap-2 mt-2">
+                                        {item.imageUrls.map((url: string, idx: number) => (
+                                          <img
+                                            key={idx}
+                                            src={url}
+                                            alt={`${item.title} ${idx + 1}`}
+                                            className="w-full h-24 object-cover rounded"
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Certifications */}
+                        {portfolioItems.filter((item: any) => {
+                          if (item.type !== "certification") return false;
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            item.title?.toLowerCase().includes(query) ||
+                            item.description?.toLowerCase().includes(query) ||
+                            item.issuer?.toLowerCase().includes(query)
+                          );
+                        }).length > 0 && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Certifications</h3>
+                            <div className="space-y-4 max-h-[480px] overflow-y-auto">
+                              {portfolioItems
+                                .filter((item: any) => {
+                                  if (item.type !== "certification") return false;
+                                  if (!searchQuery.trim()) return true;
+                                  const query = searchQuery.toLowerCase();
+                                  return (
+                                    item.title?.toLowerCase().includes(query) ||
+                                    item.description?.toLowerCase().includes(query) ||
+                                    item.issuer?.toLowerCase().includes(query)
+                                  );
+                                })
+                                .map((item: any) => (
+                                  <div
+                                    key={item.portfolioId}
+                                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                                  >
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">
+                                            Certification
+                                          </span>
+                                          <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                                        </div>
+                                        {item.description && (
+                                          <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                                        )}
+                                        {item.issuer && (
+                                          <p className="text-xs text-gray-500">Issued by: {item.issuer}</p>
+                                        )}
+                                        {item.dateIssued && (
+                                          <p className="text-xs text-gray-500">
+                                            Issued: {new Date(item.dateIssued).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {item.expirationDate && (
+                                          <p className="text-xs text-gray-500">
+                                            Expires: {new Date(item.expirationDate).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                        {!item.dateIssued && !item.expirationDate && item.date && (
+                                          <p className="text-xs text-gray-500">
+                                            {new Date(item.date).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                      </div>
+                                      {isViewingOwnProfile && (
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEditPortfolio(item)}
+                                            className="text-blue-600 hover:text-blue-700 text-sm"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeletePortfolio(item.portfolioId)}
+                                            className="text-red-600 hover:text-red-700 text-sm"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {item.imageUrl && (
+                                      <img
+                                        src={item.imageUrl}
+                                        alt={item.title}
+                                        className="w-full h-48 object-cover rounded-lg mt-2"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show message if no items */}
+                        {portfolioItems.filter((item: any) => {
+                          if (item.type !== "project") return false;
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            item.title?.toLowerCase().includes(query) ||
+                            item.description?.toLowerCase().includes(query) ||
+                            item.company?.toLowerCase().includes(query) ||
+                            item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                          );
+                        }).length === 0 &&
+                          portfolioItems.filter((item: any) => {
+                            if (item.type !== "certification") return false;
+                            if (!searchQuery.trim()) return true;
+                            const query = searchQuery.toLowerCase();
+                            return (
+                              item.title?.toLowerCase().includes(query) ||
+                              item.description?.toLowerCase().includes(query) ||
+                              item.issuer?.toLowerCase().includes(query)
+                            );
+                          }).length === 0 && (
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                              {searchQuery.trim() ? "No portfolio items match your search" : "No portfolio items yet"}
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </ProfileCard>
+                  </div>
+                )}
+
+                {/* Education - Only for taskers */}
+                {rawUserData?.role?.toLowerCase() === "tasker" && (
+                  <div className={activeTab === "education" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
+                  <ProfileCard
+                    title="Education"
+                    description="Academic background"
+                    action={
+                      isViewingOwnProfile ? (
+                        <button
+                          type="button"
+                          onClick={handleAddEducation}
+                          className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50"
+                        >
+                          Add Education
+                        </button>
+                      ) : undefined
+                    }
+                  >
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                      {educationItems.length > 0 ? (
+                        educationItems.map((item: any) => (
                           <div
-                            key={item.portfolioId}
+                            key={item.educationId}
                             className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
-                                    {item.type === "certification" ? "Certification" : "Project"}
-                                  </span>
-                                  <h4 className="font-semibold text-gray-900">{item.title}</h4>
-                                </div>
-                                {item.description && (
-                                  <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                                )}
-                                {item.type === "certification" && item.issuer && (
-                                  <p className="text-xs text-gray-500">Issued by: {item.issuer}</p>
-                                )}
-                                {item.type === "project" && item.company && (
-                                  <p className="text-xs text-gray-500">Client: {item.company}</p>
-                                )}
-                                {item.date && (
-                                  <p className="text-xs text-gray-500">
-                                    {new Date(item.date).toLocaleDateString()}
+                                <h4 className="font-semibold text-gray-900 mb-1">{item.institution}</h4>
+                                {item.degree && (
+                                  <p className="text-sm text-gray-700 mb-1">
+                                    {item.degree}
                                   </p>
+                                )}
+                                {(item.startDate || item.endDate) && (
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {item.startDate && new Date(item.startDate).toLocaleDateString()}
+                                    {item.startDate && item.endDate && " - "}
+                                    {item.endDate && new Date(item.endDate).toLocaleDateString()}
+                                    {item.isCurrentlyStudying && " (Currently studying)"}
+                                  </p>
+                                )}
+                                {item.description && (
+                                  <p className="text-sm text-gray-600 mt-2">{item.description}</p>
                                 )}
                               </div>
                               {isViewingOwnProfile && (
                                 <div className="flex gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleEditPortfolio(item)}
+                                    onClick={() => handleEditEducation(item)}
                                     className="text-blue-600 hover:text-blue-700 text-sm"
                                   >
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDeletePortfolio(item.portfolioId)}
+                                    onClick={() => handleDeleteEducation(item.educationId)}
                                     className="text-red-600 hover:text-red-700 text-sm"
                                   >
                                     Delete
@@ -871,65 +1434,79 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                                 </div>
                               )}
                             </div>
-                            {item.imageUrl && (
-                              <img
-                                src={item.imageUrl}
-                                alt={item.title}
-                                className="w-full h-48 object-cover rounded-lg mt-2"
-                              />
-                            )}
-                            {item.imageUrls && item.imageUrls.length > 0 && (
-                              <div className="grid grid-cols-3 gap-2 mt-2">
-                                {item.imageUrls.map((url: string, idx: number) => (
-                                  <img
-                                    key={idx}
-                                    src={url}
-                                    alt={`${item.title} ${idx + 1}`}
-                                    className="w-full h-24 object-cover rounded"
-                                  />
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                          No education records yet
+                        </div>
+                      )}
+                    </div>
                   </ProfileCard>
-                </div>
+                  </div>
+                )}
 
-                {/* Tasker Reviews */}
-                <div className={activeTab === "reviews" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
-                  <ProfileCard
-                    title="Tasker Reviews"
-                    description="Client feedback"
-                    action={
-                      !isViewingOwnProfile && rawUserData?.role === "tasker" ? (
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateReviewModal(true)}
-                          className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50"
-                        >
-                          Write Review
-                        </button>
-                      ) : undefined
-                    }
-                  >
-                    {rawUserData?.role === "tasker" && targetUserId ? (
-                      <ReviewsSection
-                        taskerId={targetUserId}
-                        isViewingOwnProfile={isViewingOwnProfile}
-                      />
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-400">
-                        Reviews are only available for taskers
-                      </div>
-                    )}
-                  </ProfileCard>
-                </div>
+                {/* Tasker Reviews - Only show for taskers */}
+                {rawUserData?.role?.toLowerCase() === "tasker" && (
+                  <div className={activeTab === "reviews" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
+                    <ProfileCard
+                      title="Tasker Reviews"
+                      description="Client feedback"
+                      action={
+                        !isViewingOwnProfile && rawUserData?.role === "tasker" ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateReviewModal(true)}
+                            className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50"
+                          >
+                            Write Review
+                          </button>
+                        ) : undefined
+                      }
+                    >
+                      {targetUserId ? (
+                        <ReviewsSection
+                          taskerId={targetUserId}
+                          isViewingOwnProfile={isViewingOwnProfile}
+                        />
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-400">
+                          Reviews are only available for taskers
+                        </div>
+                      )}
+                    </ProfileCard>
+                  </div>
+                )}
                 </div>
 
                 {/* Right Content Area - 70% (Posts Feed) */}
                 <div className={`lg:col-span-8 ${activeTab === "posts" ? "block" : "hidden lg:block"}`}>
+                {/* Search Bar */}
+                <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search posts, portfolio, reviews..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <svg
+                      className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
                 {/* Create Post Box - Only show for own profile */}
                 {isViewingOwnProfile && (
                   <div className="mb-4">
@@ -970,7 +1547,17 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
                       </p>
                     </div>
                   ) : (
-                    posts.map((post) => (
+                    posts
+                      .filter((post) => {
+                        if (!searchQuery.trim()) return true;
+                        const query = searchQuery.toLowerCase();
+                        return (
+                          post.content?.toLowerCase().includes(query) ||
+                          postUsers[post.userId]?.firstName?.toLowerCase().includes(query) ||
+                          postUsers[post.userId]?.lastName?.toLowerCase().includes(query)
+                        );
+                      })
+                      .map((post) => (
                       <PostCard
                         key={post.postId}
                         post={post}
@@ -1046,6 +1633,26 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
         }}
         onSave={handleSavePortfolio}
         initialData={editingPortfolioItem}
+        loading={saving}
+      />
+
+      <ScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => {
+          setShowScheduleModal(false);
+          loadSchedule();
+        }}
+        userId={targetUserId}
+      />
+
+      <EducationModal
+        isOpen={showEducationModal}
+        onClose={() => {
+          setShowEducationModal(false);
+          setEditingEducationItem(null);
+        }}
+        onSave={handleSaveEducation}
+        initialData={editingEducationItem}
         loading={saving}
       />
 

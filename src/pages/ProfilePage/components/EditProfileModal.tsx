@@ -1,7 +1,8 @@
 import type { FC } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FiX, FiSave } from "react-icons/fi";
 import ImageUploadField from "./ImageUploadField";
+import { getAllSkills } from "../../../lib/api/skills.api";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -44,10 +45,53 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
   const isTasker = userRole === "tasker";
   const [formData, setFormData] = useState(initialData);
   const [skillInput, setSkillInput] = useState("");
+  const [allSkills, setAllSkills] = useState<string[]>([]);
+  const [skillSuggestions, setSkillSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const skillInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setFormData(initialData);
   }, [initialData]);
+
+  useEffect(() => {
+    if (isTasker) {
+      const loadSkills = async () => {
+        try {
+          // GET from fetch.utils returns: { status, response, message }
+          const response = await getAllSkills();
+          let skillsData: string[] = [];
+          if (response?.response?.skills && Array.isArray(response.response.skills)) {
+            skillsData = response.response.skills;
+          } else if (Array.isArray(response?.response)) {
+            skillsData = response.response;
+          } else if (Array.isArray(response?.skills)) {
+            skillsData = response.skills;
+          }
+          setAllSkills(skillsData);
+        } catch (error) {
+          console.error("Load skills error:", error);
+        }
+      };
+      loadSkills();
+    }
+  }, [isTasker]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        skillInputRef.current &&
+        !skillInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -59,12 +103,47 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
   };
 
   const handleAddSkill = () => {
-    if (skillInput.trim()) {
+    const trimmedSkill = skillInput.trim();
+    if (trimmedSkill && !formData.skills?.includes(trimmedSkill)) {
       setFormData((prev) => ({
         ...prev,
-        skills: [...(prev.skills || []), skillInput.trim()],
+        skills: [...(prev.skills || []), trimmedSkill],
       }));
       setSkillInput("");
+      setShowSuggestions(false);
+      setSkillSuggestions([]);
+    }
+  };
+
+  const handleSkillInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSkillInput(value);
+    
+    if (value.trim().length > 0) {
+      const filtered = allSkills.filter((skill) =>
+        skill.toLowerCase().includes(value.toLowerCase()) &&
+        !formData.skills?.includes(skill)
+      );
+      setSkillSuggestions(filtered.slice(0, 5));
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSkillSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSkillSuggestionClick = (skill: string) => {
+    if (!formData.skills?.includes(skill)) {
+      setFormData((prev) => ({
+        ...prev,
+        skills: [...(prev.skills || []), skill],
+      }));
+      setSkillInput("");
+      setShowSuggestions(false);
+      setSkillSuggestions([]);
+      if (skillInputRef.current) {
+        skillInputRef.current.focus();
+      }
     }
   };
 
@@ -247,27 +326,50 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       Skills
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={skillInput}
-                        onChange={(e) => setSkillInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddSkill();
-                          }
-                        }}
-                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        placeholder="Add a skill (press Enter)"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddSkill}
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-                      >
-                        Add
-                      </button>
+                    <div className="relative">
+                      <div className="flex gap-2">
+                        <input
+                          ref={skillInputRef}
+                          type="text"
+                          value={skillInput}
+                          onChange={handleSkillInputChange}
+                          onFocus={() => {
+                            if (skillSuggestions.length > 0) setShowSuggestions(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddSkill();
+                            }
+                          }}
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder="Add a skill (press Enter)"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddSkill}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {showSuggestions && skillSuggestions.length > 0 && (
+                        <div
+                          ref={suggestionsRef}
+                          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {skillSuggestions.map((skill, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSkillSuggestionClick(skill)}
+                              className="w-full text-left px-4 py-2 hover:bg-blue-50 transition"
+                            >
+                              {skill}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {formData.skills && formData.skills.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">

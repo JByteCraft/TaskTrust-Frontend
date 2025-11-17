@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FiSend, FiMessageCircle, FiUser } from "react-icons/fi";
+import { FiSend, FiMessageCircle, FiUser, FiSearch, FiPlus, FiX } from "react-icons/fi";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
 import { GET, POST } from "../../lib/utils/fetch.utils";
 import {
@@ -10,12 +10,19 @@ import {
 
 const Messages: React.FC = () => {
   const [conversations, setConversations] = useState<any[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [users, setUsers] = useState<{ [key: number]: any }>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [filteredAvailableUsers, setFilteredAvailableUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentUser = getAuthenticatedUserFromToken<{
@@ -34,13 +41,50 @@ const Messages: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedConversation) {
+    // Filter conversations based on search query
+    if (!searchQuery.trim()) {
+      setFilteredConversations(conversations);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = conversations.filter((conv: any) => {
+        const otherId =
+          conv.participant1Id === currentUserId
+            ? conv.participant2Id
+            : conv.participant1Id;
+        const otherUser = users[otherId];
+        if (!otherUser) return false;
+        const userName = getUserName(otherId).toLowerCase();
+        return userName.includes(query);
+      });
+      setFilteredConversations(filtered);
+    }
+  }, [searchQuery, conversations, users, currentUserId]);
+
+  useEffect(() => {
+    // Filter available users for new message modal
+    if (!userSearchQuery.trim()) {
+      setFilteredAvailableUsers(availableUsers);
+    } else {
+      const query = userSearchQuery.toLowerCase();
+      const filtered = availableUsers.filter((user: any) => {
+        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+        return fullName.includes(query);
+      });
+      setFilteredAvailableUsers(filtered);
+    }
+  }, [userSearchQuery, availableUsers]);
+
+  useEffect(() => {
+    if (selectedConversation && selectedConversation.conversationId !== 0) {
       loadMessages(selectedConversation.conversationId);
       // Poll for new messages every 3 seconds
       const interval = setInterval(() => {
         loadMessages(selectedConversation.conversationId);
       }, 3000);
       return () => clearInterval(interval);
+    } else if (selectedConversation && selectedConversation.conversationId === 0) {
+      // Temporary conversation - clear messages
+      setMessages([]);
     }
   }, [selectedConversation]);
 
@@ -71,6 +115,7 @@ const Messages: React.FC = () => {
       }
 
       setConversations(Array.isArray(convos) ? convos : []);
+      setFilteredConversations(Array.isArray(convos) ? convos : []);
       
       // Load user data for participants
       const userIds = new Set<number>();
@@ -150,12 +195,47 @@ const Messages: React.FC = () => {
 
     try {
       setSending(true);
+      
+      // If conversationId is 0, it's a temporary conversation - get receiverId from participants
+      let receiverId: number;
+      if (selectedConversation.conversationId === 0) {
+        // Temporary conversation - determine receiver from participants
+        receiverId = selectedConversation.participant1Id === currentUserId
+          ? selectedConversation.participant2Id
+          : selectedConversation.participant1Id;
+      } else {
+        // Existing conversation - get receiver from other participant
+        const otherParticipant = getOtherParticipant(selectedConversation);
+        if (!otherParticipant) {
+          alert("Cannot determine recipient");
+          return;
+        }
+        receiverId = otherParticipant.userId;
+      }
+      
       await sendMessage({
-        conversationId: selectedConversation.conversationId,
+        receiverId: receiverId,
+        conversationId: selectedConversation.conversationId === 0 ? undefined : selectedConversation.conversationId,
         content: newMessage.trim(),
       });
       setNewMessage("");
-      await loadMessages(selectedConversation.conversationId);
+      
+      // Reload conversations to get the newly created conversation
+      await loadConversations();
+      
+      // Find and select the new conversation
+      setTimeout(async () => {
+        await loadConversations();
+        const foundConv = conversations.find(
+          (conv: any) =>
+            (conv.participant1Id === receiverId && conv.participant2Id === currentUserId) ||
+            (conv.participant2Id === receiverId && conv.participant1Id === currentUserId)
+        );
+        if (foundConv) {
+          setSelectedConversation(foundConv);
+          await loadMessages(foundConv.conversationId);
+        }
+      }, 300);
     } catch (error: any) {
       console.error("Send message error:", error);
       alert(error.response?.data?.message || "Failed to send message");
@@ -186,6 +266,89 @@ const Messages: React.FC = () => {
     return (first + last).toUpperCase() || "U";
   };
 
+  const loadAvailableUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const token = getStoredAuthToken();
+      if (!token) return;
+
+      const response = await GET<any>("/users", "", token);
+      let usersData: any[] = [];
+      
+      if (response?.response && Array.isArray(response.response)) {
+        usersData = response.response;
+      } else if (response?.data && Array.isArray(response.data)) {
+        usersData = response.data;
+      } else if (Array.isArray(response)) {
+        usersData = response;
+      }
+
+      // Filter out current user and users we already have conversations with
+      const existingUserIds = new Set(
+        conversations.map((conv: any) => [
+          conv.participant1Id,
+          conv.participant2Id,
+        ]).flat()
+      );
+
+      const filtered = usersData.filter(
+        (user: any) =>
+          user.userId !== currentUserId &&
+          !existingUserIds.has(user.userId)
+      );
+
+      setAvailableUsers(filtered);
+      setFilteredAvailableUsers(filtered);
+    } catch (error) {
+      console.error("Load available users error:", error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleNewMessageClick = () => {
+    setShowNewMessageModal(true);
+    loadAvailableUsers();
+  };
+
+  const handleStartConversation = async (userId: number) => {
+    try {
+      // Find existing conversation
+      const existingConv = conversations.find(
+        (conv: any) =>
+          conv.participant1Id === userId || conv.participant2Id === userId
+      );
+
+      if (existingConv) {
+        setSelectedConversation(existingConv);
+        setShowNewMessageModal(false);
+        return;
+      }
+
+      // Close modal and create a temporary conversation object
+      // The conversation will be created when the user sends their first message
+      setShowNewMessageModal(false);
+      
+      // Create a temporary conversation object for UI purposes
+      // This will be replaced with the real conversation when the first message is sent
+      const tempConversation = {
+        conversationId: 0, // Temporary ID
+        participant1Id: currentUserId < userId ? currentUserId : userId,
+        participant2Id: currentUserId < userId ? userId : currentUserId,
+        participant1: currentUserId,
+        participant2: userId,
+      };
+      
+      setSelectedConversation(tempConversation);
+      
+      // Load user data for the selected user
+      await loadUsers([userId]);
+    } catch (error: any) {
+      console.error("Start conversation error:", error);
+      alert(error.response?.data?.message || "Failed to start conversation");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200">
       <div className="container mx-auto px-4 py-6">
@@ -194,18 +357,43 @@ const Messages: React.FC = () => {
             {/* Conversations List */}
             <div className="w-1/3 border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200 bg-blue-50">
-                <h2 className="text-xl font-bold text-gray-900">Messages</h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-xl font-bold text-gray-900">Messages</h2>
+                  <button
+                    type="button"
+                    onClick={handleNewMessageClick}
+                    className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition shrink-0"
+                    title="New Message"
+                    aria-label="New Message"
+                  >
+                    <FiPlus className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="relative">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search conversations..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="p-4 text-center text-gray-500">Loading conversations...</div>
-                ) : conversations.length === 0 ? (
+                ) : filteredConversations.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
                     <FiMessageCircle className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No conversations yet</p>
+                    <p>
+                      {searchQuery.trim()
+                        ? "No conversations found"
+                        : "No conversations yet"}
+                    </p>
                   </div>
                 ) : (
-                  conversations.map((conversation: any) => {
+                  filteredConversations.map((conversation: any) => {
                     const otherUser = getOtherParticipant(conversation);
                     return (
                       <button
@@ -351,6 +539,92 @@ const Messages: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* New Message Modal */}
+      {showNewMessageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-md"
+            onClick={() => {
+              setShowNewMessageModal(false);
+              setUserSearchQuery("");
+            }}
+            role="presentation"
+          />
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">New Message</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewMessageModal(false);
+                  setUserSearchQuery("");
+                }}
+                className="p-1 rounded-full hover:bg-gray-100 transition"
+                aria-label="Close"
+              >
+                <FiX className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-4 border-b border-gray-200">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  placeholder="Search users..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingUsers ? (
+                <div className="text-center text-gray-500 py-8">Loading users...</div>
+              ) : filteredAvailableUsers.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  {userSearchQuery.trim()
+                    ? "No users found"
+                    : "No users available"}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredAvailableUsers.map((user: any) => (
+                    <button
+                      key={user.userId}
+                      type="button"
+                      onClick={() => handleStartConversation(user.userId)}
+                      className="w-full p-3 rounded-lg hover:bg-gray-50 transition text-left flex items-center gap-3"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        {user.profilePictureUrl ? (
+                          <img
+                            src={user.profilePictureUrl}
+                            alt={`${user.firstName} ${user.lastName}`}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-blue-600 font-semibold text-sm">
+                            {`${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-900 truncate">
+                          {`${user.firstName} ${user.lastName}`.trim() || "Unknown User"}
+                        </h4>
+                        {user.expertise && (
+                          <p className="text-sm text-gray-500 truncate">{user.expertise}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

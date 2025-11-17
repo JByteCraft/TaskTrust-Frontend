@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { FiMapPin, FiDollarSign, FiClock, FiUser, FiCheckCircle } from "react-icons/fi";
 import { getJob, getJobMatches, getMatchPercentage } from "../../lib/api/jobs.api";
-import { createApplication, getJobApplications } from "../../lib/api/applications.api";
+import { createApplication, getJobApplications, getApplications } from "../../lib/api/applications.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
+import { GET } from "../../lib/utils/fetch.utils";
 
 type Job = {
   jobId: number;
@@ -37,6 +38,8 @@ const JobDetails = () => {
   const [applications, setApplications] = useState<any[]>([]);
   const [showMatches, setShowMatches] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
+  const [posterName, setPosterName] = useState<string>("");
+  const [hasApplied, setHasApplied] = useState(false);
 
   const user = getAuthenticatedUserFromToken<{ userId: number; role: string }>();
   const isTasker = user?.role === "tasker";
@@ -70,7 +73,20 @@ const JobDetails = () => {
         if (jobData && jobData.jobId) {
           setJob(jobData);
           
-          // If tasker, get match percentage
+          // Fetch poster name
+          if (jobData.customerId) {
+            try {
+              const userResponse = await GET<any>(`/users/${jobData.customerId}/public`, "", token);
+              const userData = userResponse?.response || userResponse?.data || userResponse;
+              if (userData?.firstName && userData?.lastName) {
+                setPosterName(`${userData.firstName} ${userData.lastName}`);
+              }
+            } catch (err) {
+              console.error("Fetch poster name error:", err);
+            }
+          }
+          
+          // If tasker, get match percentage and check if already applied
           if (isTasker && user?.userId) {
             try {
               const matchResponse = await getMatchPercentage(
@@ -83,6 +99,22 @@ const JobDetails = () => {
             } catch (err) {
               console.error("Match calculation error:", err);
             }
+
+            // Check if tasker has already applied
+            try {
+              const myAppsResponse = await getApplications({ jobId: Number(jobId), taskerId: user.userId });
+              // axios returns: { data: { status, response, message } }
+              let myAppsData: any[] = [];
+              if (myAppsResponse?.data?.response && Array.isArray(myAppsResponse.data.response)) {
+                myAppsData = myAppsResponse.data.response;
+              } else if (Array.isArray(myAppsResponse?.data)) {
+                myAppsData = myAppsResponse.data;
+              }
+              setHasApplied(myAppsData.length > 0);
+            } catch (err) {
+              console.error("Check application error:", err);
+              setHasApplied(false);
+            }
           }
 
           // If owner, get applications
@@ -90,11 +122,17 @@ const JobDetails = () => {
           if (isOwner) {
             try {
               const appsResponse = await getJobApplications(Number(jobId));
-              // Backend returns: { status: 200, response: [...], message: '...' }
-              const appsData = appsResponse?.data?.response || appsResponse?.data?.data || appsResponse?.data || [];
-              setApplications(Array.isArray(appsData) ? appsData : []);
+              // axios returns: { data: { status, response, message } }
+              let appsData: any[] = [];
+              if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+                appsData = appsResponse.data.response;
+              } else if (Array.isArray(appsResponse?.data)) {
+                appsData = appsResponse.data;
+              }
+              setApplications(appsData);
             } catch (err) {
               console.error("Fetch applications error:", err);
+              setApplications([]);
             }
           }
         } else {
@@ -131,6 +169,7 @@ const JobDetails = () => {
       alert("Application submitted successfully!");
       setShowApplicationForm(false);
       setApplicationData({ coverLetter: "", proposedBudget: "" });
+      setHasApplied(true); // Mark as applied
     } catch (error: any) {
       console.error("Apply error:", error);
       alert(error.response?.data?.message || "Failed to submit application");
@@ -143,12 +182,19 @@ const JobDetails = () => {
     if (!jobId) return;
     try {
       const response = await getJobMatches(Number(jobId));
-      // Backend returns: { status: 200, response: [...], message: '...' }
-      const matchesData = response?.data?.response || response?.data?.data || response?.data || [];
-      setMatches(Array.isArray(matchesData) ? matchesData : []);
+      // axios returns: { data: { status, response, message } }
+      let matchesData: any[] = [];
+      if (response?.data?.response && Array.isArray(response.data.response)) {
+        matchesData = response.data.response;
+      } else if (Array.isArray(response?.data)) {
+        matchesData = response.data;
+      }
+      setMatches(matchesData);
       setShowMatches(true);
     } catch (error) {
       console.error("Fetch matches error:", error);
+      setMatches([]);
+      setShowMatches(true);
     }
   };
 
@@ -231,6 +277,18 @@ const JobDetails = () => {
               </div>
             )}
           </div>
+          
+          {posterName && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-2 text-gray-600">
+                <FiUser className="w-4 h-4" />
+                <span className="text-sm">
+                  <span className="text-gray-500">Posted by:</span>{" "}
+                  <span className="font-semibold text-gray-900">{posterName}</span>
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -259,10 +317,66 @@ const JobDetails = () => {
               </div>
             )}
 
+            {/* Applications List (Owner) */}
+            {isOwner && applications.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Applications ({applications.length})
+                </h2>
+                <div className="space-y-3">
+                  {applications.map((app: any) => (
+                    <div
+                      key={app.applicationId}
+                      className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-md transition"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            Application #{app.applicationId}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Status: <span className={`font-medium ${
+                              app.status === "accepted" ? "text-green-600" :
+                              app.status === "rejected" ? "text-red-600" :
+                              "text-yellow-600"
+                            }`}>
+                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                            </span>
+                          </p>
+                        </div>
+                        {app.proposedBudget && (
+                          <div className="text-right">
+                            <p className="text-sm text-gray-600">Proposed Budget</p>
+                            <p className="font-semibold text-gray-900">₱{app.proposedBudget.toLocaleString()}</p>
+                          </div>
+                        )}
+                      </div>
+                      {app.coverLetter && (
+                        <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                          {app.coverLetter}
+                        </p>
+                      )}
+                      <Link
+                        to={`/users/${app.taskerId}`}
+                        className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+                      >
+                        View Tasker Profile →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Application Form (Tasker) */}
             {isTasker && job.status === "open" && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                {!showApplicationForm ? (
+                {hasApplied ? (
+                  <div className="text-center py-4">
+                    <p className="text-gray-700 font-medium mb-2">You have already applied to this job</p>
+                    <p className="text-sm text-gray-500">Check your applications page to see the status</p>
+                  </div>
+                ) : !showApplicationForm ? (
                   <button
                     onClick={() => setShowApplicationForm(true)}
                     className="w-full bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
@@ -365,12 +479,9 @@ const JobDetails = () => {
                 >
                   View Matched Taskers
                 </button>
-                <Link
-                  to={`/jobs/${job.jobId}/applications`}
-                  className="block w-full text-center border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm sm:text-base"
-                >
-                  View Applications ({applications.length})
-                </Link>
+                <div className="text-sm text-gray-600 mb-2">
+                  Applications: <span className="font-semibold text-gray-900">{applications.length}</span>
+                </div>
               </div>
             )}
           </div>

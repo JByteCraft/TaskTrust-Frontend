@@ -25,6 +25,20 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
   const [date, setDate] = useState(
     initialData?.date ? new Date(initialData.date).toISOString().split("T")[0] : ""
   );
+  // Certification dates
+  const [dateIssued, setDateIssued] = useState(
+    initialData?.dateIssued ? new Date(initialData.dateIssued).toISOString().split("T")[0] : ""
+  );
+  const [expirationDate, setExpirationDate] = useState(
+    initialData?.expirationDate ? new Date(initialData.expirationDate).toISOString().split("T")[0] : ""
+  );
+  // Project dates
+  const [dateStarted, setDateStarted] = useState(
+    initialData?.dateStarted ? new Date(initialData.dateStarted).toISOString().split("T")[0] : ""
+  );
+  const [dateEnd, setDateEnd] = useState(
+    initialData?.dateEnd ? new Date(initialData.dateEnd).toISOString().split("T")[0] : ""
+  );
   const [issuer, setIssuer] = useState(initialData?.issuer || "");
   const [company, setCompany] = useState(initialData?.company || "");
   const [location, setLocation] = useState(initialData?.location || "");
@@ -95,20 +109,44 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
       type,
       title,
       description,
-      date: date || undefined,
     };
 
     if (type === "certification") {
       data.issuer = issuer;
       data.imageUrl = imageUrl;
+      if (dateIssued) data.dateIssued = dateIssued;
+      if (expirationDate) data.expirationDate = expirationDate;
+      // Keep date for backward compatibility
+      if (date) data.date = date;
     } else {
       data.company = company;
       data.location = location;
       data.imageUrls = imageUrls;
       data.skills = skills;
+      if (dateStarted) data.dateStarted = dateStarted;
+      if (dateEnd) data.dateEnd = dateEnd;
+      // Keep date for backward compatibility
+      if (date) data.date = date;
     }
 
     await onSave(data);
+    
+    // Clear fields after successful save
+    setTitle("");
+    setDescription("");
+    setDate("");
+    setDateIssued("");
+    setExpirationDate("");
+    setDateStarted("");
+    setDateEnd("");
+    setIssuer("");
+    setCompany("");
+    setLocation("");
+    setImageUrl("");
+    setImageUrls([]);
+    setSkills([]);
+    setSkillInput("");
+    setType("certification");
   };
 
   const handleClose = () => {
@@ -127,10 +165,10 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="absolute inset-0" onClick={handleClose} aria-hidden="true" />
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="relative w-full max-w-2xl max-h-[90vh] rounded-2xl bg-white shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 shrink-0">
           <h2 className="text-xl font-bold text-gray-900">
             {initialData ? "Edit Portfolio Item" : "Add Portfolio Item"}
           </h2>
@@ -144,7 +182,7 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
           </button>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        <div className="px-6 py-6 space-y-6 overflow-y-auto flex-1">
           {/* Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
@@ -202,21 +240,6 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
             />
           </div>
 
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <FiCalendar className="inline w-4 h-4 mr-1" />
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              disabled={loading}
-            />
-          </div>
-
           {/* Certification-specific fields */}
           {type === "certification" && (
             <>
@@ -231,6 +254,36 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
                   onChange={(e) => setIssuer(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., TESDA, PRC"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Date Issued */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FiCalendar className="inline w-4 h-4 mr-1" />
+                  Date Issued
+                </label>
+                <input
+                  type="date"
+                  value={dateIssued}
+                  onChange={(e) => setDateIssued(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Expiration Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FiCalendar className="inline w-4 h-4 mr-1" />
+                  Expiration Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={expirationDate}
+                  onChange={(e) => setExpirationDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   disabled={loading}
                 />
               </div>
@@ -294,6 +347,36 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
                   onChange={(e) => setLocation(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Project location"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Date Started */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FiCalendar className="inline w-4 h-4 mr-1" />
+                  Date Started
+                </label>
+                <input
+                  type="date"
+                  value={dateStarted}
+                  onChange={(e) => setDateStarted(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Date End */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FiCalendar className="inline w-4 h-4 mr-1" />
+                  Date End (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={dateEnd}
+                  onChange={(e) => setDateEnd(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   disabled={loading}
                 />
               </div>
@@ -381,7 +464,7 @@ const PortfolioModal: React.FC<PortfolioModalProps> = ({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 shrink-0">
           <button
             type="button"
             onClick={handleClose}

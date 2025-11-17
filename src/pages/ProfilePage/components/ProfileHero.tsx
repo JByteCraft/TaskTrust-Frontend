@@ -8,6 +8,7 @@ import {
   FiStar,
   FiCamera,
   FiFileText,
+  FiMessageCircle,
 } from "react-icons/fi";
 
 export type ProfileStats = {
@@ -26,6 +27,7 @@ interface ProfileHeroProps {
   isLegit?: boolean;
   onAddPost?: () => void;
   onEditProfile?: () => void;
+  onMessage?: () => void;
   onUploadAvatar?: () => void;
   onUploadCover?: () => void;
   onGenerateResume?: () => void;
@@ -40,6 +42,7 @@ const ProfileHero: FC<ProfileHeroProps> = ({
   isLegit,
   onAddPost,
   onEditProfile,
+  onMessage,
   onUploadAvatar,
   onUploadCover,
   onGenerateResume,
@@ -127,21 +130,25 @@ const ProfileHero: FC<ProfileHeroProps> = ({
                     {(stats?.connections ?? 0).toLocaleString()} Connections
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <FiCheckCircle className="h-3.5 w-3.5 text-blue-500 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="whitespace-nowrap">{stats?.tasksCompleted ?? 0} Task Completed</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <FiStar className="h-3.5 w-3.5 text-blue-500 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="whitespace-nowrap">
-                    {(stats?.rating ?? 0).toFixed(1)}/5 Ratings (
-                    {stats?.reviews ?? 0})
-                  </span>
-                </div>
+                {role.toLowerCase() !== "customer" && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <FiCheckCircle className="h-3.5 w-3.5 text-blue-500 sm:h-4 sm:w-4 shrink-0" />
+                    <span className="whitespace-nowrap">{stats?.tasksCompleted ?? 0} Task Completed</span>
+                  </div>
+                )}
+                {role.toLowerCase() !== "customer" && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <FiStar className="h-3.5 w-3.5 text-blue-500 sm:h-4 sm:w-4 shrink-0" />
+                    <span className="whitespace-nowrap">
+                      {(stats?.rating ?? 0).toFixed(1)}/5 Ratings (
+                      {stats?.reviews ?? 0})
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          {(onAddPost || onEditProfile || onGenerateResume) && (
+          {(onAddPost || onEditProfile || onMessage || onGenerateResume) && (
             <div className="flex w-full flex-col gap-2 pb-1 sm:w-auto sm:flex-row sm:justify-center lg:justify-end">
               {onAddPost && (
                 <button
@@ -153,14 +160,24 @@ const ProfileHero: FC<ProfileHeroProps> = ({
                   Add Post
                 </button>
               )}
+              {onMessage && (
+                <button
+                  type="button"
+                  onClick={onMessage}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-blue-300 bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-100 active:bg-blue-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 sm:w-auto sm:px-5 sm:text-sm"
+                >
+                  <FiMessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  Message
+                </button>
+              )}
               {onEditProfile && (
                 <button
                   type="button"
                   onClick={onEditProfile}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 px-4 py-2.5 text-xs font-semibold text-gray-700 transition hover:border-blue-300 hover:text-blue-600 active:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 sm:w-auto sm:px-5 sm:text-sm"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-gray-300 px-3 py-2.5 text-xs font-semibold text-gray-700 transition hover:border-blue-300 hover:text-blue-600 active:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 sm:px-4 sm:text-sm whitespace-nowrap"
                 >
-                  <FiEdit2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Edit Profile
+                  <FiEdit2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                  <span>Edit Profile</span>
                 </button>
               )}
               {onGenerateResume && (

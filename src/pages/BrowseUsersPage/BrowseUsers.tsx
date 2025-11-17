@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiSearch, FiFilter, FiUser, FiStar, FiUserPlus, FiUserCheck, FiX, FiCheckCircle } from "react-icons/fi";
 import { GET } from "../../lib/utils/fetch.utils";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
-import { sendConnectionRequest, getConnectionStatus, acceptConnection, rejectConnection } from "../../lib/api/connections.api";
+import { sendConnectionRequest, getConnectionStatus, acceptConnection, rejectConnection, removeConnection } from "../../lib/api/connections.api";
 
 type UserCard = {
   userId: number;
@@ -46,9 +46,25 @@ const BrowseUsers = () => {
         setLoading(true);
         const response = await GET<any>("/users", "", token);
         
-        const usersData = response?.data || response?.users || response || [];
-        setUsers(Array.isArray(usersData) ? usersData : []);
-        setFilteredUsers(Array.isArray(usersData) ? usersData : []);
+        // fetch.utils returns: { status, response, message }
+        // Backend RESPONSE utility returns: { status, response: users[], message }
+        let usersData: any[] = [];
+        
+        if (response?.response && Array.isArray(response.response)) {
+          usersData = response.response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          usersData = response.data;
+        } else if (response?.users && Array.isArray(response.users)) {
+          usersData = response.users;
+        } else if (Array.isArray(response)) {
+          usersData = response;
+        }
+        
+        // Filter out the current logged-in user
+        const filteredData = usersData.filter((user: any) => user.userId !== currentUser?.userId);
+        
+        setUsers(filteredData);
+        setFilteredUsers(filteredData);
       } catch (err: any) {
         console.error("Fetch users error:", err);
       } finally {
@@ -74,7 +90,19 @@ const BrowseUsers = () => {
       if (user.userId === currentUser.userId) continue;
       try {
         const response = await getConnectionStatus(user.userId);
-        statuses[user.userId] = response.data?.data || {};
+        // fetch.utils returns: { status, response, message }
+        // Backend RESPONSE utility returns: { status, response: {...}, message }
+        let statusData: any = { status: "none" };
+        
+        if (response?.response) {
+          statusData = response.response;
+        } else if (response?.data) {
+          statusData = response.data;
+        } else if (response?.status) {
+          statusData = response;
+        }
+        
+        statuses[user.userId] = statusData;
       } catch (error) {
         // User might not have connection status yet
         statuses[user.userId] = { status: "none" };
@@ -89,12 +117,22 @@ const BrowseUsers = () => {
 
     setConnecting(userId);
     try {
-      await sendConnectionRequest(userId);
-      await loadConnectionStatuses();
-      alert("Connection request sent!");
+      const response = await sendConnectionRequest(userId);
+      // Check if request was successful
+      if (response?.status === 200 || response?.status === 201 || response?.response) {
+        await loadConnectionStatuses();
+        alert("Connection request sent!");
+      } else {
+        const errorMsg = response?.message || "Failed to send connection request";
+        alert(errorMsg);
+      }
     } catch (error: any) {
       console.error("Connect error:", error);
-      alert(error.response?.data?.message || "Failed to send connection request");
+      const errorMsg = error?.response?.data?.message || 
+                       error?.response?.message || 
+                       error?.message || 
+                       "Failed to send connection request";
+      alert(errorMsg);
     } finally {
       setConnecting(null);
     }
@@ -361,12 +399,31 @@ const BrowseUsers = () => {
                           if (isRequester) {
                             return (
                               <button
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full flex items-center justify-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-700"
-                                disabled
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm("Are you sure you want to cancel this connection request?")) {
+                                    return;
+                                  }
+                                  try {
+                                    const connId = connectionStatuses[user.userId]?.connection?.connectionId;
+                                    if (connId) {
+                                      const response = await removeConnection(connId);
+                                      if (response?.status === 200 || response?.response) {
+                                        await loadConnectionStatuses();
+                                        alert("Connection request cancelled");
+                                      } else {
+                                        alert(response?.message || "Failed to cancel connection request");
+                                      }
+                                    }
+                                  } catch (error: any) {
+                                    console.error("Cancel connection error:", error);
+                                    alert(error?.response?.data?.message || error?.message || "Failed to cancel connection request");
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition"
                               >
-                                <FiUserPlus />
-                                Pending
+                                <FiX />
+                                Cancel Request
                               </button>
                             );
                           } else {
@@ -378,11 +435,17 @@ const BrowseUsers = () => {
                                     try {
                                       const connId = connectionStatuses[user.userId]?.connection?.connectionId;
                                       if (connId) {
-                                        await acceptConnection(connId);
-                                        await loadConnectionStatuses();
+                                        const response = await acceptConnection(connId);
+                                        if (response?.status === 200 || response?.response) {
+                                          await loadConnectionStatuses();
+                                          alert("Connection accepted!");
+                                        } else {
+                                          alert(response?.message || "Failed to accept connection");
+                                        }
                                       }
-                                    } catch (error) {
+                                    } catch (error: any) {
                                       console.error("Accept error:", error);
+                                      alert(error?.response?.data?.message || error?.message || "Failed to accept connection");
                                     }
                                   }}
                                   className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -396,11 +459,16 @@ const BrowseUsers = () => {
                                     try {
                                       const connId = connectionStatuses[user.userId]?.connection?.connectionId;
                                       if (connId) {
-                                        await rejectConnection(connId);
-                                        await loadConnectionStatuses();
+                                        const response = await rejectConnection(connId);
+                                        if (response?.status === 200 || response?.response) {
+                                          await loadConnectionStatuses();
+                                        } else {
+                                          alert(response?.message || "Failed to reject connection");
+                                        }
                                       }
-                                    } catch (error) {
+                                    } catch (error: any) {
                                       console.error("Reject error:", error);
+                                      alert(error?.response?.data?.message || error?.message || "Failed to reject connection");
                                     }
                                   }}
                                   className="flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"

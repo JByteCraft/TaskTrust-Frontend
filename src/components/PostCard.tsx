@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { FiHeart, FiMessageCircle, FiShare2, FiMoreVertical, FiEdit, FiTrash2, FiCheckCircle } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { getPostComments, createComment, deleteComment } from "../lib/api/comments.api";
-import { createReaction, checkUserReaction, getTargetReactions } from "../lib/api/reactions.api";
+import { createReaction, checkUserReaction } from "../lib/api/reactions.api";
 import { deletePost } from "../lib/api/posts.api";
 import { getAuthenticatedUserFromToken } from "../lib/utils/auth.utils";
 import { GET } from "../lib/utils/fetch.utils";
@@ -57,7 +57,6 @@ const PostCard = ({ post, author, onPostDeleted, onPostUpdated }: PostCardProps)
   const [commentText, setCommentText] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [userReaction, setUserReaction] = useState<any>(null);
-  const [reactions, setReactions] = useState<any>({});
   const [likesCount, setLikesCount] = useState(post.likes);
   const [commentsCount, setCommentsCount] = useState(post.comments);
   const [showMenu, setShowMenu] = useState(false);
@@ -94,15 +93,6 @@ const PostCard = ({ post, author, onPostDeleted, onPostUpdated }: PostCardProps)
     } catch (error) {
       console.error("Check reaction error:", error);
       setUserReaction(null);
-    }
-  };
-
-  const loadReactions = async () => {
-    try {
-      const response = await getTargetReactions("post", post.postId);
-      setReactions(response.data?.data || {});
-    } catch (error) {
-      console.error("Load reactions error:", error);
     }
   };
 
@@ -238,7 +228,6 @@ const PostCard = ({ post, author, onPostDeleted, onPostUpdated }: PostCardProps)
       
       // Always refresh to get accurate state
       await checkReaction();
-      loadReactions();
     } catch (error) {
       console.error("Like error:", error);
     } finally {

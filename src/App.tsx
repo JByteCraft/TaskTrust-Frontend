@@ -11,6 +11,7 @@ import Profile from "./pages/ProfilePage/Profile";
 import BrowseUsers from "./pages/BrowseUsersPage/BrowseUsers";
 import BrowseJobs from "./pages/BrowseJobsPage/BrowseJobs";
 import CreateJob from "./pages/CreateJobPage/CreateJob";
+import EditJob from "./pages/EditJobPage/EditJob";
 import JobDetails from "./pages/JobDetailsPage/JobDetails";
 import MyJobs from "./pages/MyJobsPage/MyJobs";
 import MyApplications from "./pages/MyApplicationsPage/MyApplications";
@@ -20,6 +21,7 @@ import Notifications from "./pages/NotificationsPage/Notifications";
 import Messages from "./pages/MessagesPage/Messages";
 import ForgotPassword from "./pages/ForgotPasswordPage/ForgotPassword";
 import ResetPassword from "./pages/ResetPasswordPage/ResetPassword";
+import Search from "./pages/SearchPage/Search";
 import GuestRoute from "./routes/GuestRoute";
 import Navbar from "./components/Navbar";
 
@@ -42,6 +44,7 @@ const AppShell = () => {
           <Route path="/connections" element={<Connections />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/users" element={<BrowseUsers />} />
           <Route path="/users/:userId" element={<Profile />} />
@@ -49,6 +52,7 @@ const AppShell = () => {
           <Route path="/jobs/create" element={<CreateJob />} />
           <Route path="/jobs/my-jobs" element={<MyJobs />} />
           <Route path="/jobs/:jobId" element={<JobDetails />} />
+          <Route path="/jobs/:jobId/edit" element={<EditJob />} />
           <Route path="/applications/my-applications" element={<MyApplications />} />
           <Route
             path="/Login"

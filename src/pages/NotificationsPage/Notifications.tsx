@@ -5,7 +5,7 @@ import { FiBell, FiCheck, FiX } from "react-icons/fi";
 import {
   getNotifications,
   markNotificationAsRead,
-  markAllAsRead,
+  markAllNotificationsAsRead,
   deleteNotification,
 } from "../../lib/api/notifications.api";
 import { getStoredAuthToken } from "../../lib/utils/auth.utils";
@@ -40,13 +40,28 @@ const Notifications = () => {
       setLoading(true);
       const response = await getNotifications();
       // Backend returns: { status: 200, response: { notifications, unreadCount }, message: '...' }
-      const responseData = response?.data?.response || response?.data?.data || response?.data || {};
+      let responseData: any = {};
+      if (response?.response && typeof response.response === 'object') {
+        responseData = response.response;
+      } else if (response?.data?.response && typeof response.data.response === 'object') {
+        responseData = response.data.response;
+      } else if (response?.data && typeof response.data === 'object') {
+        responseData = response.data;
+      } else if (Array.isArray(response?.response)) {
+        responseData = { notifications: response.response };
+      } else if (Array.isArray(response?.data)) {
+        responseData = { notifications: response.data };
+      } else if (Array.isArray(response)) {
+        responseData = { notifications: response };
+      }
+      
       const notificationsList = Array.isArray(responseData.notifications)
         ? responseData.notifications
         : Array.isArray(responseData)
         ? responseData
         : [];
       setNotifications(notificationsList);
+      
       const unread =
         responseData.unreadCount ||
         notificationsList.filter((n: Notification) => !n.isRead).length;
@@ -77,7 +92,7 @@ const Notifications = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await markAllAsRead();
+      await markAllNotificationsAsRead();
       setNotifications((prev) =>
         prev.map((notif) => ({ ...notif, isRead: true }))
       );

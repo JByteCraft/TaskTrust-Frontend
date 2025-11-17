@@ -1,20 +1,10 @@
 // src/lib/api/connections.api.ts
-import axios from "axios";
-import { API_BASE_URL } from "./config";
-import { getAuthToken } from "../utils/auth.utils";
-
-const getHeaders = () => ({
-  headers: {
-    Authorization: `Bearer ${getAuthToken()}`,
-  },
-});
+import { GET, POST, PATCH, DELETE } from "../utils/fetch.utils";
+import { getStoredAuthToken } from "../utils/auth.utils";
 
 export const sendConnectionRequest = async (receiverId: number) => {
-  return axios.post(
-    `${API_BASE_URL}/connections/request`,
-    { receiverId },
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return POST("/connections/request", "", { receiverId }, token);
 };
 
 export const getConnections = async (filters?: {
@@ -22,60 +12,48 @@ export const getConnections = async (filters?: {
   status?: string;
   type?: "sent" | "received" | "all";
 }) => {
+  const token = getStoredAuthToken();
   const params = new URLSearchParams();
   if (filters?.userId) params.append("userId", filters.userId.toString());
   if (filters?.status) params.append("status", filters.status);
   if (filters?.type) params.append("type", filters.type);
-
-  return axios.get(
-    `${API_BASE_URL}/connections?${params.toString()}`,
-    getHeaders()
-  );
+  
+  const queryString = params.toString();
+  return GET(`/connections${queryString ? `?${queryString}` : ""}`, "", token);
 };
 
 export const getMyConnections = async () => {
-  return axios.get(`${API_BASE_URL}/connections/my-connections`, getHeaders());
+  const token = getStoredAuthToken();
+  return GET("/connections/my-connections", "", token);
 };
 
 export const getPendingRequests = async () => {
-  return axios.get(`${API_BASE_URL}/connections/pending`, getHeaders());
+  const token = getStoredAuthToken();
+  return GET("/connections/pending", "", token);
 };
 
 export const getConnectionStatus = async (userId: number) => {
-  return axios.get(
-    `${API_BASE_URL}/connections/status/${userId}`,
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return GET(`/connections/status/${userId}`, "", token);
 };
 
 export const acceptConnection = async (connectionId: number) => {
-  return axios.patch(
-    `${API_BASE_URL}/connections/${connectionId}/accept`,
-    {},
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return PATCH(`/connections/${connectionId}/accept`, "", {}, token);
 };
 
 export const rejectConnection = async (connectionId: number) => {
-  return axios.patch(
-    `${API_BASE_URL}/connections/${connectionId}/reject`,
-    {},
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return PATCH(`/connections/${connectionId}/reject`, "", {}, token);
 };
 
 export const blockUser = async (userId: number) => {
-  return axios.post(
-    `${API_BASE_URL}/connections/block/${userId}`,
-    {},
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return POST(`/connections/block/${userId}`, "", {}, token);
 };
 
 export const removeConnection = async (connectionId: number) => {
-  return axios.delete(
-    `${API_BASE_URL}/connections/${connectionId}`,
-    getHeaders()
-  );
+  const token = getStoredAuthToken();
+  return DELETE(`/connections/${connectionId}`, "", {}, token);
 };
 

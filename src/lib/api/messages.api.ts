@@ -1,4 +1,4 @@
-import { GET, POST } from "../utils/fetch.utils";
+import { GET, POST, PATCH } from "../utils/fetch.utils";
 import { getStoredAuthToken } from "../utils/auth.utils";
 
 export const getConversations = async () => {
@@ -8,21 +8,19 @@ export const getConversations = async () => {
 
 export const getMessages = async (conversationId: number) => {
   const token = getStoredAuthToken();
-  return GET(`/messages/conversations/${conversationId}/messages`, "", token);
+  return GET(`/messages/conversation/${conversationId}`, "", token);
 };
 
 export const sendMessage = async (data: {
-  conversationId: number;
+  receiverId: number;
   content: string;
+  conversationId?: number;
 }) => {
   const token = getStoredAuthToken();
   return POST("/messages", "", data, token);
 };
 
-export const createConversation = async (data: {
-  participant1Id: number;
-  participant2Id: number;
-}) => {
+export const markMessageAsRead = async (messageId: number) => {
   const token = getStoredAuthToken();
-  return POST("/messages/conversations", "", data, token);
+  return PATCH(`/messages/${messageId}/read`, "", {}, token);
 };

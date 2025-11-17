@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiEdit, FiTrash2, FiEye, FiUsers, FiDollarSign, FiMapPin, FiClock } from "react-icons/fi";
-import { getMyJobs, deleteJob } from "../../lib/api/jobs.api";
+import { FiEdit, FiTrash2, FiEye, FiUsers, FiDollarSign, FiMapPin, FiClock, FiX } from "react-icons/fi";
+import { getMyJobs, deleteJob, updateJob } from "../../lib/api/jobs.api";
 import { getJobApplications } from "../../lib/api/applications.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
 
@@ -28,6 +28,7 @@ const MyJobs = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [applicationCounts, setApplicationCounts] = useState<{ [key: number]: number }>({});
+  const [filter, setFilter] = useState<"all" | "open" | "in_progress" | "completed" | "cancelled">("all");
 
   const user = getAuthenticatedUserFromToken<{ role: string }>();
 
@@ -97,8 +98,32 @@ const MyJobs = () => {
     fetchJobs();
   }, [navigate]);
 
+  const handleCancel = async (jobId: number) => {
+    if (!confirm("Are you sure you want to cancel this job? This action cannot be undone.")) {
+      return;
+    }
+
+    const token = getStoredAuthToken();
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      setDeleting(jobId);
+      await updateJob(jobId, { status: "cancelled" });
+      setJobs(jobs.map((job) => job.jobId === jobId ? { ...job, status: "cancelled" } : job));
+      alert("Job cancelled successfully");
+    } catch (error: any) {
+      console.error("Cancel error:", error);
+      alert(error.response?.data?.message || "Failed to cancel job");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const handleDelete = async (jobId: number) => {
-    if (!confirm("Are you sure you want to delete this job?")) {
+    if (!confirm("Are you sure you want to delete this job? This will permanently remove it.")) {
       return;
     }
 
@@ -144,6 +169,22 @@ const MyJobs = () => {
     );
   }
 
+  // Group jobs by status
+  const openJobs = jobs.filter((job) => job.status === "open");
+  const inProgressJobs = jobs.filter((job) => job.status === "in_progress");
+  const completedJobs = jobs.filter((job) => job.status === "completed");
+  const cancelledJobs = jobs.filter((job) => job.status === "cancelled");
+
+  // Filter jobs based on selected filter
+  const filteredJobs = jobs.filter((job) => {
+    if (filter === "all") return true;
+    if (filter === "open") return job.status === "open";
+    if (filter === "in_progress") return job.status === "in_progress";
+    if (filter === "completed") return job.status === "completed";
+    if (filter === "cancelled") return job.status === "cancelled";
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -161,10 +202,92 @@ const MyJobs = () => {
           </Link>
         </div>
 
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-gray-900">{jobs.length}</div>
+            <div className="text-sm text-gray-600">Total</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-green-600">{openJobs.length}</div>
+            <div className="text-sm text-gray-600">Open</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-blue-600">{inProgressJobs.length}</div>
+            <div className="text-sm text-gray-600">In Progress</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-gray-600">{completedJobs.length}</div>
+            <div className="text-sm text-gray-600">Completed</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-red-600">{cancelledJobs.length}</div>
+            <div className="text-sm text-gray-600">Cancelled</div>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            All ({jobs.length})
+          </button>
+          <button
+            onClick={() => setFilter("open")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "open"
+                ? "bg-green-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Open ({openJobs.length})
+          </button>
+          <button
+            onClick={() => setFilter("in_progress")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "in_progress"
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            In Progress ({inProgressJobs.length})
+          </button>
+          <button
+            onClick={() => setFilter("completed")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "completed"
+                ? "bg-gray-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Completed ({completedJobs.length})
+          </button>
+          <button
+            onClick={() => setFilter("cancelled")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "cancelled"
+                ? "bg-red-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Cancelled ({cancelledJobs.length})
+          </button>
+        </div>
+
         {/* Jobs List */}
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 sm:p-12 text-center">
-            <p className="text-gray-500 text-base sm:text-lg mb-4">You haven't posted any jobs yet</p>
+            <p className="text-gray-500 text-base sm:text-lg mb-4">
+              {jobs.length === 0
+                ? "You haven't posted any jobs yet"
+                : `No ${filter === "all" ? "" : filter.replace("_", " ")} jobs found`}
+            </p>
             <Link
               to="/jobs/create"
               className="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
@@ -174,7 +297,7 @@ const MyJobs = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => (
+            {filteredJobs.map((job) => (
               <div
                 key={job.jobId}
                 className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow"
@@ -272,6 +395,14 @@ const MyJobs = () => {
                         <FiEdit />
                         Edit
                       </Link>
+                      <button
+                        onClick={() => handleCancel(job.jobId)}
+                        disabled={deleting === job.jobId}
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition disabled:opacity-50 text-sm"
+                      >
+                        <FiX />
+                        Cancel
+                      </button>
                       <button
                         onClick={() => handleDelete(job.jobId)}
                         disabled={deleting === job.jobId}

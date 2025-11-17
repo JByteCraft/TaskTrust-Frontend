@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FiEye, FiX, FiCheckCircle, FiClock, FiDollarSign } from "react-icons/fi";
-import { getMyApplications, deleteApplication } from "../../lib/api/applications.api";
+import { getMyApplications, deleteApplication, getApplications } from "../../lib/api/applications.api";
 import { getJob } from "../../lib/api/jobs.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
 
@@ -29,6 +29,9 @@ const MyApplications = () => {
   const [jobs, setJobs] = useState<{ [key: number]: Job }>({});
   const [loading, setLoading] = useState(true);
   const [withdrawing, setWithdrawing] = useState<number | null>(null);
+  const [filter, setFilter] = useState<"all" | "pending" | "accepted" | "rejected" | "cancelled" | "employed">("all");
+  const [employedJobs, setEmployedJobs] = useState<Job[]>([]);
+  const [loadingEmployed, setLoadingEmployed] = useState(false);
 
   const user = getAuthenticatedUserFromToken<{ role: string }>();
 
@@ -46,6 +49,62 @@ const MyApplications = () => {
       </div>
     );
   }
+
+  useEffect(() => {
+    const fetchEmployedJobs = async () => {
+      const token = getStoredAuthToken();
+      if (!token) return;
+
+      try {
+        setLoadingEmployed(true);
+        // Get accepted applications
+        const appsResponse = await getMyApplications();
+        let appsData: any[] = [];
+        if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+          appsData = appsResponse.data.response;
+        } else if (Array.isArray(appsResponse?.data)) {
+          appsData = appsResponse.data;
+        }
+        
+        const acceptedApps = appsData.filter((app: Application) => app.status === "accepted");
+        
+        // Get job details for each accepted application
+        const jobsList: Job[] = [];
+        for (const app of acceptedApps) {
+          try {
+            const jobResponse = await getJob(app.jobId);
+            let jobData: any = null;
+            if (jobResponse?.data?.response) {
+              jobData = jobResponse.data.response;
+            } else if (jobResponse?.data?.data) {
+              jobData = jobResponse.data.data;
+            } else if (jobResponse?.data?.jobId) {
+              jobData = jobResponse.data;
+            }
+            
+            if (jobData) {
+              jobsList.push({
+                jobId: jobData.jobId,
+                title: jobData.title,
+                budget: jobData.budget,
+                status: jobData.status,
+              });
+            }
+          } catch (err) {
+            console.error(`Failed to fetch job ${app.jobId}:`, err);
+          }
+        }
+        
+        setEmployedJobs(jobsList);
+      } catch (error) {
+        console.error("Fetch employed jobs error:", error);
+      } finally {
+        setLoadingEmployed(false);
+      }
+    };
+
+    fetchEmployedJobs();
+  }, [navigate]);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -153,9 +212,21 @@ const MyApplications = () => {
   const pendingApps = applications.filter((app) => app.status === "pending");
   const acceptedApps = applications.filter((app) => app.status === "accepted");
   const rejectedApps = applications.filter((app) => app.status === "rejected");
+  const cancelledApps = applications.filter((app) => app.status === "cancelled" || app.status === "withdrawn");
   const otherApps = applications.filter(
-    (app) => !["pending", "accepted", "rejected"].includes(app.status)
+    (app) => !["pending", "accepted", "rejected", "cancelled", "withdrawn"].includes(app.status)
   );
+
+  // Filter applications based on selected filter
+  const filteredApplications = applications.filter((app) => {
+    if (filter === "all") return true;
+    if (filter === "pending") return app.status === "pending";
+    if (filter === "accepted") return app.status === "accepted";
+    if (filter === "rejected") return app.status === "rejected";
+    if (filter === "cancelled") return app.status === "cancelled" || app.status === "withdrawn";
+    if (filter === "employed") return false; // Employed jobs shown separately
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-200 via-white to-blue-200 py-4 sm:py-8">
@@ -167,10 +238,10 @@ const MyApplications = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="text-2xl font-bold text-gray-900">{applications.length}</div>
-            <div className="text-sm text-gray-600">Total Applications</div>
+            <div className="text-sm text-gray-600">Total</div>
           </div>
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="text-2xl font-bold text-yellow-600">{pendingApps.length}</div>
@@ -184,12 +255,127 @@ const MyApplications = () => {
             <div className="text-2xl font-bold text-red-600">{rejectedApps.length}</div>
             <div className="text-sm text-gray-600">Rejected</div>
           </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="text-2xl font-bold text-gray-600">{cancelledApps.length}</div>
+            <div className="text-sm text-gray-600">Cancelled</div>
+          </div>
         </div>
 
+        {/* Filter Tabs */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            All ({applications.length})
+          </button>
+          <button
+            onClick={() => setFilter("pending")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "pending"
+                ? "bg-yellow-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Pending ({pendingApps.length})
+          </button>
+          <button
+            onClick={() => setFilter("accepted")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "accepted"
+                ? "bg-green-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Accepted ({acceptedApps.length})
+          </button>
+          <button
+            onClick={() => setFilter("rejected")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "rejected"
+                ? "bg-red-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Rejected ({rejectedApps.length})
+          </button>
+          <button
+            onClick={() => setFilter("cancelled")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "cancelled"
+                ? "bg-gray-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Cancelled ({cancelledApps.length})
+          </button>
+          <button
+            onClick={() => setFilter("employed")}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              filter === "employed"
+                ? "bg-purple-600 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+          >
+            Employed ({employedJobs.length})
+          </button>
+        </div>
+
+        {/* Employed Jobs List */}
+        {filter === "employed" && (
+          <>
+            {loadingEmployed ? (
+              <div className="text-center py-8">Loading employed jobs...</div>
+            ) : employedJobs.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                <p className="text-gray-500">You are not currently employed in any jobs</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {employedJobs.map((job) => (
+                  <div
+                    key={job.jobId}
+                    className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition"
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+                          <span className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(job.status)}`}>
+                            {job.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span className="font-semibold text-gray-900">₱{job.budget.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <Link
+                        to={`/jobs/${job.jobId}`}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+                      >
+                        <FiEye />
+                        View Job
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         {/* Applications List */}
-        {applications.length === 0 ? (
+        {filter !== "employed" && filteredApplications.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 sm:p-12 text-center">
-            <p className="text-gray-500 text-base sm:text-lg mb-4">You haven't applied to any jobs yet</p>
+            <p className="text-gray-500 text-base sm:text-lg mb-4">
+              {applications.length === 0
+                ? "You haven't applied to any jobs yet"
+                : `No ${filter === "all" ? "" : filter} applications found`}
+            </p>
             <Link
               to="/jobs"
               className="inline-block bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-blue-700 transition text-sm sm:text-base"
@@ -199,7 +385,7 @@ const MyApplications = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {applications.map((app) => {
+            {filteredApplications.map((app) => {
               const job = jobs[app.jobId];
               return (
                 <div

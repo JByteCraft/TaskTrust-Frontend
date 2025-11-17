@@ -6,6 +6,7 @@ import {
   FiHome,
   FiUser,
   FiMessageCircle,
+  FiRss,
   FiUsers,
   FiBriefcase,
   FiBell,
@@ -20,7 +21,7 @@ import { getNotifications } from "../lib/api/notifications.api";
 const navItems = [
   { icon: FiHome, label: "Home", path: "/" },
   { icon: FiUser, label: "Profile", path: "/profile" },
-  { icon: FiMessageCircle, label: "Feed", path: "/feed" },
+  { icon: FiRss, label: "Feed", path: "/feed" },
   { icon: FiUsers, label: "Network", path: "/connections" },
   { icon: FiBriefcase, label: "Jobs", path: "/jobs" },
   { icon: FiMessageCircle, label: "Messages", path: "/messages" },
@@ -32,6 +33,7 @@ const Navbar: FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   const authUser = getAuthenticatedUserFromToken<{
@@ -89,9 +91,16 @@ const Navbar: FC = () => {
       if (!token) return;
 
       try {
-        const response = await getNotifications();
-        const data = response?.data?.data || response?.data || {};
-        setUnreadCount(data.unreadCount || 0);
+        const response = await getNotifications(false); // Get only unread
+        // Backend returns: { status: 200, response: { notifications, unreadCount }, message: '...' }
+        const responseData = response?.response || response?.data?.response || response?.data || response || {};
+        const notificationsList = Array.isArray(responseData.notifications)
+          ? responseData.notifications
+          : Array.isArray(responseData)
+          ? responseData
+          : [];
+        const unread = notificationsList.filter((n: any) => !n.isRead).length;
+        setUnreadCount(responseData.unreadCount || unread || 0);
       } catch (error) {
         console.error("Load unread count error:", error);
       }
@@ -198,6 +207,14 @@ const Navbar: FC = () => {
                 id="navbar-search"
                 type="search"
                 placeholder="Search on TaskTrust"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter" && searchQuery.trim()) {
+                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                    setSearchQuery("");
+                  }
+                }}
                 className="w-full rounded-full border border-blue-100 bg-blue-50/60 py-2 pl-11 pr-4 text-sm text-gray-700 placeholder:text-blue-300 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>

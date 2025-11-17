@@ -5,7 +5,7 @@ import { FiCheck, FiX, FiBell } from "react-icons/fi";
 import {
   getNotifications,
   markNotificationAsRead,
-  markAllAsRead,
+  markAllNotificationsAsRead,
   deleteNotification,
 } from "../lib/api/notifications.api";
 
@@ -65,19 +65,35 @@ const NotificationsDropdown = ({
     try {
       setLoading(true);
       const response = await getNotifications();
-      const data = response?.data?.data || response?.data || {};
-      const notificationsList = Array.isArray(data.notifications)
-        ? data.notifications
-        : Array.isArray(data)
-        ? data
+      // Backend returns: { status: 200, response: { notifications, unreadCount }, message: '...' }
+      let responseData: any = {};
+      if (response?.response && typeof response.response === 'object') {
+        responseData = response.response;
+      } else if (response?.data?.response && typeof response.data.response === 'object') {
+        responseData = response.data.response;
+      } else if (response?.data && typeof response.data === 'object') {
+        responseData = response.data;
+      } else if (Array.isArray(response?.response)) {
+        responseData = { notifications: response.response };
+      } else if (Array.isArray(response?.data)) {
+        responseData = { notifications: response.data };
+      } else if (Array.isArray(response)) {
+        responseData = { notifications: response };
+      }
+      
+      const notificationsList = Array.isArray(responseData.notifications)
+        ? responseData.notifications
+        : Array.isArray(responseData)
+        ? responseData
         : [];
       setNotifications(notificationsList);
+      
       const unread =
-        data.unreadCount ||
+        responseData.unreadCount ||
         notificationsList.filter((n: Notification) => !n.isRead).length;
       setUnreadCount(unread);
       if (onUnreadCountChange) {
-        onUnreadCountChange(unread);
+        onUnreadCountChange(responseData.unreadCount || unread);
       }
     } catch (error) {
       console.error("Load notifications error:", error);
@@ -108,7 +124,7 @@ const NotificationsDropdown = ({
 
   const handleMarkAllAsRead = async () => {
     try {
-      await markAllAsRead();
+      await markAllNotificationsAsRead();
       setNotifications((prev) =>
         prev.map((notif) => ({ ...notif, isRead: true }))
       );

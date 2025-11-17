@@ -8,6 +8,7 @@ interface UploadCoverModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpload: (url: string) => Promise<void>;
+  onRemove?: () => Promise<void>;
   currentCoverUrl?: string;
   loading?: boolean;
 }
@@ -16,6 +17,7 @@ const UploadCoverModal: FC<UploadCoverModalProps> = ({
   isOpen,
   onClose,
   onUpload,
+  onRemove,
   currentCoverUrl,
   loading = false,
 }) => {
@@ -337,33 +339,52 @@ const UploadCoverModal: FC<UploadCoverModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={loading}
-            className="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleUpload}
-            disabled={!selectedFile || loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <FiUpload className="h-4 w-4" />
-                Upload
-              </>
+        <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+          <div>
+            {currentCoverUrl && onRemove && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm("Are you sure you want to remove your cover photo?")) {
+                    await onRemove();
+                    handleClose();
+                  }
+                }}
+                disabled={loading || uploading}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                Remove Photo
+              </button>
             )}
-          </button>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={loading || uploading}
+              className="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={!selectedFile || loading || uploading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {uploading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <FiUpload className="h-4 w-4" />
+                  Upload
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

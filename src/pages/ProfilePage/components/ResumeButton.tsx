@@ -105,69 +105,69 @@ const ResumeButton: React.FC<ResumeButtonProps> = ({ userId }) => {
         yPos += 5;
       }
 
-      // Projects
-      if (resumeData.projects && resumeData.projects.length > 0) {
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Projects", 20, yPos);
-        yPos += 7;
-        doc.setFontSize(10);
-        resumeData.projects.forEach((project: any) => {
-          doc.setFont("helvetica", "bold");
-          doc.text(project.title, 20, yPos);
-          yPos += 5;
-          doc.setFont("helvetica", "normal");
-          if (project.company) {
-            doc.text(`Client: ${project.company}`, 20, yPos);
-            yPos += 5;
-          }
-          if (project.description) {
-            const descLines = doc.splitTextToSize(project.description, 170);
-            doc.text(descLines, 20, yPos);
-            yPos += descLines.length * 5;
-          }
-          yPos += 3;
-        });
-        yPos += 5;
-      }
-
-      // Work Experience
+      // Work Experience (includes both completed jobs and projects)
       if (resumeData.workExperience && resumeData.workExperience.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text("Work Experience", 20, yPos);
         yPos += 7;
         doc.setFontSize(10);
-        resumeData.workExperience.forEach((job: any) => {
+        resumeData.workExperience.forEach((exp: any) => {
           doc.setFont("helvetica", "bold");
-          doc.text(job.title, 20, yPos);
+          doc.text(exp.title, 20, yPos);
           yPos += 5;
           doc.setFont("helvetica", "normal");
-          doc.text(job.company, 20, yPos);
+          doc.text(exp.company, 20, yPos);
           yPos += 5;
-          if (job.description) {
-            const descLines = doc.splitTextToSize(job.description, 170);
+          if (exp.dateStarted || exp.dateEnd) {
+            const startDate = exp.dateStarted ? new Date(exp.dateStarted).toLocaleDateString() : '';
+            const endDate = exp.dateEnd ? new Date(exp.dateEnd).toLocaleDateString() : 'Present';
+            doc.text(`${startDate} - ${endDate}`, 20, yPos);
+            yPos += 5;
+          } else if (exp.date) {
+            doc.text(new Date(exp.date).toLocaleDateString(), 20, yPos);
+            yPos += 5;
+          }
+          if (exp.description) {
+            const descLines = doc.splitTextToSize(exp.description, 170);
             doc.text(descLines, 20, yPos);
             yPos += descLines.length * 5;
+          }
+          if (exp.skills && exp.skills.length > 0) {
+            doc.text(`Skills: ${exp.skills.join(", ")}`, 20, yPos);
+            yPos += 5;
           }
           yPos += 3;
         });
         yPos += 5;
       }
 
-      // Reviews & Ratings
-      if (resumeData.reviews && resumeData.reviews.totalReviews > 0) {
+      // Education
+      if (resumeData.education && resumeData.education.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
-        doc.text("Reviews & Ratings", 20, yPos);
+        doc.text("Education", 20, yPos);
         yPos += 7;
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(
-          `Average Rating: ${resumeData.reviews.averageRating}/5 (${resumeData.reviews.totalReviews} reviews)`,
-          20,
-          yPos
-        );
+        resumeData.education.forEach((edu: any) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(edu.school || "School", 20, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          if (edu.degree) {
+            doc.text(edu.degree, 20, yPos);
+            yPos += 5;
+          }
+          if (edu.dateStarted || edu.dateEnded) {
+            const startDate = edu.dateStarted ? new Date(edu.dateStarted).toLocaleDateString() : '';
+            const endDate = edu.dateEnded ? new Date(edu.dateEnded).toLocaleDateString() : 'Present';
+            doc.text(`${startDate} - ${endDate}`, 20, yPos);
+            yPos += 5;
+          }
+          yPos += 3;
+        });
+        yPos += 5;
       }
 
       // Save PDF

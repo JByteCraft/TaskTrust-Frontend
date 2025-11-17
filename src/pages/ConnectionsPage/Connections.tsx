@@ -42,9 +42,11 @@ const Connections = () => {
   const navigate = useNavigate();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<PendingRequest[]>([]);
   const [users, setUsers] = useState<{ [key: number]: User }>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"connections" | "pending">("connections");
+  const [pendingFilter, setPendingFilter] = useState<"all" | "received" | "sent">("all");
 
   useEffect(() => {
     const token = getStoredAuthToken();
@@ -72,22 +74,27 @@ const Connections = () => {
       const response = await getMyConnections();
       
       // Extract connections from various response structures
+      // Backend returns: { status: 200, response: [...], message: '...' }
       let connectionsData: any[] = [];
-      if (response?.data) {
-        if (response.data.response && Array.isArray(response.data.response)) {
-          connectionsData = response.data.response;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          connectionsData = response.data.data;
-        } else if (Array.isArray(response.data)) {
-          connectionsData = response.data;
-        }
+      if (response?.response && Array.isArray(response.response)) {
+        connectionsData = response.response;
+      } else if (response?.data?.response && Array.isArray(response.data.response)) {
+        connectionsData = response.data.response;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        connectionsData = response.data.data;
+      } else if (Array.isArray(response?.data)) {
+        connectionsData = response.data;
+      } else if (Array.isArray(response)) {
+        connectionsData = response;
       }
       
       const connectionsArray = Array.isArray(connectionsData) ? connectionsData : [];
       setConnections(connectionsArray);
 
       // Load user data
-      const userIds = connectionsArray.map((c: any) => c.userId || c.receiverId || c.requesterId).filter(Boolean);
+      const userIds = connectionsArray
+        .map((c: any) => c.userId || c.receiverId || c.requesterId)
+        .filter((id: any) => id !== null && id !== undefined);
       if (userIds.length > 0) {
         await loadUsers(userIds);
       }
@@ -99,14 +106,39 @@ const Connections = () => {
   const loadPendingRequests = async () => {
     try {
       const response = await getPendingRequests();
-      // Backend returns: { status: 200, response: [...], message: '...' }
-      const requestsData = response?.data?.response || response?.data?.data || response?.data || [];
+      // GET returns: { status, response, message } or axios wraps it in { data: { status, response, message } }
+      let requestsData: any[] = [];
+      if (response?.response && Array.isArray(response.response)) {
+        requestsData = response.response;
+      } else if (response?.data?.response && Array.isArray(response.data.response)) {
+        requestsData = response.data.response;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        requestsData = response.data.data;
+      } else if (Array.isArray(response?.data)) {
+        requestsData = response.data;
+      } else if (Array.isArray(response)) {
+        requestsData = response;
+      }
+      
       const requestsArray = Array.isArray(requestsData) ? requestsData : [];
-      setPendingRequests(requestsArray);
+      
+      // Separate received and sent requests
+      const received = requestsArray.filter((r: any) => !r.isRequester);
+      const sent = requestsArray.filter((r: any) => r.isRequester);
+      
+      setPendingRequests(received);
+      setSentRequests(sent);
 
-      // Load user data for requesters
-      const userIds = requestsArray.map((r: PendingRequest) => r.requesterId);
-      await loadUsers(userIds);
+      // Load user data for both requesters and receivers
+      const userIds = [
+        ...received.map((r: any) => r.requesterId),
+        ...sent.map((r: any) => r.receiverId),
+      ].filter((id: any) => id !== null && id !== undefined);
+      
+      // Load users and wait for completion
+      if (userIds.length > 0) {
+        await loadUsers(userIds);
+      }
     } catch (error) {
       console.error("Load pending requests error:", error);
     }
@@ -119,39 +151,57 @@ const Connections = () => {
     if (!token) return;
 
     const usersMap: { [key: number]: User } = { ...users };
+    const uniqueUserIds = [...new Set(userIds)];
 
-    for (const userId of userIds) {
-      if (usersMap[userId]) continue;
+    // Load all users in parallel for better performance
+    const userPromises = uniqueUserIds
+      .filter((userId) => !usersMap[userId]) // Skip already loaded users
+      .map(async (userId) => {
+        try {
+          // Use public endpoint to avoid permission issues
+          const response = await GET<any>(`/users/${userId}/public`, "", token);
+          
+          // GET returns: { status, response, message } or axios wraps it
+          // Extract user data from various response structures
+          let userData: any = null;
+          if (response?.response && typeof response.response === 'object' && response.response.userId) {
+            userData = response.response;
+          } else if (response?.data?.response && typeof response.data.response === 'object' && response.data.response.userId) {
+            userData = response.data.response;
+          } else if (response?.data && typeof response.data === 'object' && response.data.userId) {
+            userData = response.data;
+          } else if (response?.userId) {
+            userData = response;
+          }
+          
+          if (userData && userData.userId) {
+            return {
+              userId: userData.userId,
+              user: {
+                userId: userData.userId,
+                firstName: userData.firstName || "",
+                lastName: userData.lastName || "",
+                profilePictureUrl: userData.profilePictureUrl,
+                expertise: userData.expertise,
+                city: userData.city,
+                province: userData.province,
+              }
+            };
+          }
+        } catch (error) {
+          console.error(`Failed to load user ${userId}:`, error);
+        }
+        return null;
+      });
 
-      try {
-        // Use public endpoint to avoid permission issues
-        const response = await GET<any>(`/users/${userId}/public`, "", token);
-        
-        // Extract user data from various response structures
-        let userData: any = null;
-        if (response?.response && typeof response.response === 'object' && response.response.userId) {
-          userData = response.response;
-        } else if (response?.data && typeof response.data === 'object' && response.data.userId) {
-          userData = response.data;
-        } else if (response?.userId) {
-          userData = response;
-        }
-        
-        if (userData && userData.userId) {
-          usersMap[userId] = {
-            userId: userData.userId,
-            firstName: userData.firstName || "",
-            lastName: userData.lastName || "",
-            profilePictureUrl: userData.profilePictureUrl,
-            expertise: userData.expertise,
-            city: userData.city,
-            province: userData.province,
-          };
-        }
-      } catch (error) {
-        console.error(`Failed to load user ${userId}:`, error);
+    const userResults = await Promise.all(userPromises);
+    
+    // Update users map with loaded data
+    userResults.forEach((result) => {
+      if (result && result.user) {
+        usersMap[result.userId] = result.user;
       }
-    }
+    });
 
     setUsers(usersMap);
   };
@@ -231,7 +281,7 @@ const Connections = () => {
             >
               <div className="flex items-center justify-center gap-2">
                 <FiUserPlus />
-                Pending ({pendingRequests.length})
+                Pending ({pendingRequests.length + sentRequests.length})
               </div>
             </button>
           </div>
@@ -301,8 +351,9 @@ const Connections = () => {
                         <button
                           onClick={() => handleRemove(connection.connectionId)}
                           className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Unfriend"
                         >
-                          Remove
+                          Unfriend
                         </button>
                       </div>
                     </div>
@@ -313,76 +364,165 @@ const Connections = () => {
           </div>
         ) : (
           <div>
-            {pendingRequests.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <FiUserCheck className="mx-auto text-6xl text-gray-300 mb-4" />
-                <p className="text-gray-500 text-lg">No pending requests</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingRequests.map((request) => {
-                  const user = users[request.requesterId];
-                  if (!user) return null;
+            {/* Filter for pending requests */}
+            <div className="mb-4 flex gap-2">
+              <button
+                onClick={() => setPendingFilter("all")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  pendingFilter === "all"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                All ({pendingRequests.length + sentRequests.length})
+              </button>
+              <button
+                onClick={() => setPendingFilter("received")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  pendingFilter === "received"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Received ({pendingRequests.length})
+              </button>
+              <button
+                onClick={() => setPendingFilter("sent")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  pendingFilter === "sent"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Sent ({sentRequests.length})
+              </button>
+            </div>
 
-                  return (
-                    <div
-                      key={request.connectionId}
-                      className="bg-white rounded-lg shadow-sm p-6"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-full bg-blue-200 flex items-center justify-center overflow-hidden">
-                            {user.profilePictureUrl ? (
-                              <img
-                                src={user.profilePictureUrl}
-                                alt={`${user.firstName} ${user.lastName}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-blue-700 font-semibold text-xl">
-                                {user.firstName.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <Link
-                              to={`/users/${user.userId}`}
-                              className="font-semibold text-gray-900 hover:underline"
-                            >
-                              {user.firstName} {user.lastName}
-                            </Link>
-                            {user.profession && (
-                              <p className="text-sm text-gray-600">
-                                {user.profession}
-                              </p>
-                            )}
-                            <p className="text-xs text-gray-500 mt-1">
-                              Sent {new Date(request.createdAt).toLocaleDateString()}
-                            </p>
+            {(() => {
+              const filteredRequests =
+                pendingFilter === "all"
+                  ? [...pendingRequests, ...sentRequests]
+                  : pendingFilter === "received"
+                  ? pendingRequests
+                  : sentRequests;
+
+              if (filteredRequests.length === 0) {
+                return (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <FiUserCheck className="mx-auto text-6xl text-gray-300 mb-4" />
+                    <p className="text-gray-500 text-lg">
+                      {pendingFilter === "all"
+                        ? "No pending requests"
+                        : pendingFilter === "received"
+                        ? "No received requests"
+                        : "No sent requests"}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {filteredRequests.map((request: any) => {
+                    const isSent = request.isRequester || sentRequests.some((sr: any) => sr.connectionId === request.connectionId);
+                    const userId = isSent ? request.receiverId : request.requesterId;
+                    const user = users[userId];
+                    
+                    // Show loading placeholder if user data is not yet loaded
+                    if (!user) {
+                      return (
+                        <div
+                          key={request.connectionId}
+                          className="bg-white rounded-lg shadow-sm p-6 animate-pulse"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 rounded-full bg-gray-200"></div>
+                              <div>
+                                <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                                <div className="h-3 bg-gray-200 rounded w-24"></div>
+                              </div>
+                            </div>
+                            <div className="h-10 bg-gray-200 rounded w-20"></div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleAccept(request.connectionId)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                          >
-                            <FiCheck />
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => handleReject(request.connectionId)}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                          >
-                            <FiX />
-                            Reject
-                          </button>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={request.connectionId}
+                        className="bg-white rounded-lg shadow-sm p-6"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-blue-200 flex items-center justify-center overflow-hidden">
+                              {user.profilePictureUrl ? (
+                                <img
+                                  src={user.profilePictureUrl}
+                                  alt={`${user.firstName} ${user.lastName}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-blue-700 font-semibold text-xl">
+                                  {user.firstName.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <Link
+                                to={`/users/${user.userId}`}
+                                className="font-semibold text-gray-900 hover:underline"
+                              >
+                                {user.firstName} {user.lastName}
+                              </Link>
+                              {user.expertise && (
+                                <p className="text-sm text-gray-600">
+                                  {user.expertise}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 mt-1">
+                                {isSent
+                                  ? `Sent ${new Date(request.createdAt).toLocaleDateString()}`
+                                  : `Received ${new Date(request.createdAt).toLocaleDateString()}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {isSent ? (
+                              <button
+                                onClick={() => handleRemove(request.connectionId)}
+                                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition"
+                              >
+                                <FiX />
+                                Cancel
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleAccept(request.connectionId)}
+                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                                >
+                                  <FiCheck />
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => handleReject(request.connectionId)}
+                                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                                >
+                                  <FiX />
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
