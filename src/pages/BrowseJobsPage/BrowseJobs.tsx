@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiSearch, FiFilter, FiMapPin, FiDollarSign, FiClock, FiBriefcase, FiFileText } from "react-icons/fi";
-import { getJobs, getMyJobs } from "../../lib/api/jobs.api";
+import { FiSearch, FiFilter, FiMapPin, FiClock, FiBriefcase, FiFileText, FiEye, FiX } from "react-icons/fi";
+import { getJobs, getMyJobs, getMatchPercentage } from "../../lib/api/jobs.api";
 import { getMyApplications, getApplications } from "../../lib/api/applications.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
 
@@ -13,6 +13,7 @@ type Job = {
   city?: string;
   province?: string;
   requiredSkills?: string[];
+  requiredExpertise?: string;
   status: string;
   applicationsCount: number;
   deadline?: string;
@@ -21,6 +22,7 @@ type Job = {
   customerId: number;
   createdAt: string;
   matchPercentage?: number; // Match percentage for taskers
+  employmentStatus?: string; // Application status for employed jobs (accepted, rejected, withdrawn)
 };
 
 const BrowseJobs = () => {
@@ -35,8 +37,33 @@ const BrowseJobs = () => {
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
+  const [browseBudgetFilter, setBrowseBudgetFilter] = useState("all");
+  const [browseLocationFilter, setBrowseLocationFilter] = useState("");
+  const [browseDateFilter, setBrowseDateFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<"browse" | "my-jobs" | "applications" | "employed">("browse");
+  const [viewingApplication, setViewingApplication] = useState<any>(null);
+  const [viewingJob, setViewingJob] = useState<Job | null>(null);
+  const [currentMatchPercentage, setCurrentMatchPercentage] = useState<number | null>(null);
+  const [applicationSearchQuery, setApplicationSearchQuery] = useState("");
+  const [applicationStatusFilter, setApplicationStatusFilter] = useState("all");
+  const [applicationDateFilter, setApplicationDateFilter] = useState("all");
+  const [applicationBudgetFilter, setApplicationBudgetFilter] = useState("all");
+  const [applicationLocationFilter, setApplicationLocationFilter] = useState("");
+  const [showApplicationFilters, setShowApplicationFilters] = useState(false);
+  const [myJobsSearchQuery, setMyJobsSearchQuery] = useState("");
+  const [myJobsStatusFilter, setMyJobsStatusFilter] = useState("all");
+  const [myJobsBudgetFilter, setMyJobsBudgetFilter] = useState("all");
+  const [myJobsLocationFilter, setMyJobsLocationFilter] = useState("");
+  const [myJobsDateFilter, setMyJobsDateFilter] = useState("all");
+  const [showMyJobsFilters, setShowMyJobsFilters] = useState(false);
+  const [employedSearchQuery, setEmployedSearchQuery] = useState("");
+  const [employedTaskStatusFilter, setEmployedTaskStatusFilter] = useState("all");
+  const [employedEmploymentStatusFilter, setEmployedEmploymentStatusFilter] = useState("all");
+  const [employedBudgetFilter, setEmployedBudgetFilter] = useState("all");
+  const [employedLocationFilter, setEmployedLocationFilter] = useState("");
+  const [employedDateFilter, setEmployedDateFilter] = useState("all");
+  const [showEmployedFilters, setShowEmployedFilters] = useState(false);
 
   const user = getAuthenticatedUserFromToken<{ role: string; userId?: number }>();
   const isCustomer = user?.role === "customer" || user?.role === "admin";
@@ -77,34 +104,13 @@ const BrowseJobs = () => {
         appsData = response.data;
       }
       setApplications(Array.isArray(appsData) ? appsData : []);
-    } catch (error) {
-      console.error("Load applications error:", error);
-    } finally {
-      setLoadingApplications(false);
-    }
-  };
 
-  const loadEmployedJobs = async () => {
-    const token = getStoredAuthToken();
-    if (!token) return;
-
-    try {
-      // Get accepted applications
-      const appsResponse = await getMyApplications();
-      let appsData: any[] = [];
-      if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
-        appsData = appsResponse.data.response;
-      } else if (Array.isArray(appsResponse?.data)) {
-        appsData = appsResponse.data;
-      }
-      
-      const acceptedApps = appsData.filter((app: any) => app.status === "accepted");
-      
-      // Get job details for each accepted application
+      // Fetch job details for each application to ensure we have location data
       const { getJob } = await import("../../lib/api/jobs.api");
-      const jobsList: Job[] = [];
-      for (const app of acceptedApps) {
+      const jobsToAdd: Job[] = [];
+      for (const app of appsData) {
         try {
+          // Fetch job details to ensure we have complete data including location
           const jobResponse = await getJob(app.jobId);
           let jobData: any = null;
           if (jobResponse?.data?.response) {
@@ -116,7 +122,7 @@ const BrowseJobs = () => {
           }
           
           if (jobData) {
-            jobsList.push({
+            jobsToAdd.push({
               jobId: jobData.jobId,
               title: jobData.title,
               description: jobData.description || "",
@@ -124,6 +130,7 @@ const BrowseJobs = () => {
               city: jobData.city,
               province: jobData.province,
               requiredSkills: jobData.requiredSkills,
+              requiredExpertise: jobData.requiredExpertise,
               status: jobData.status,
               applicationsCount: jobData.applicationsCount || 0,
               deadline: jobData.deadline,
@@ -137,10 +144,91 @@ const BrowseJobs = () => {
           console.error(`Failed to fetch job ${app.jobId}:`, err);
         }
       }
+
+      // Merge fetched jobs into the jobs array (avoid duplicates)
+      if (jobsToAdd.length > 0) {
+        setJobs((prevJobs) => {
+          const newJobs = [...prevJobs];
+          jobsToAdd.forEach((job) => {
+            if (!newJobs.find((j) => j.jobId === job.jobId)) {
+              newJobs.push(job);
+            }
+          });
+          return newJobs;
+        });
+      }
+    } catch (error) {
+      console.error("Load applications error:", error);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
+
+  const loadEmployedJobs = async () => {
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    try {
+      setLoadingApplications(true);
+      // Get ALL applications (pending, accepted, rejected, withdrawn) for employments tab
+      const appsResponse = await getMyApplications();
+      let appsData: any[] = [];
+      if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+        appsData = appsResponse.data.response;
+      } else if (Array.isArray(appsResponse?.data)) {
+        appsData = appsResponse.data;
+      }
+      
+      // Get ALL applications regardless of status
+      // This includes all jobs where the tasker has applied (pending, accepted, rejected, withdrawn)
+      const allApps = appsData; // Include all applications
+      
+      // Get job details for each application
+      const { getJob } = await import("../../lib/api/jobs.api");
+      const jobsList: Job[] = [];
+      for (const app of allApps) {
+        try {
+          const jobResponse = await getJob(app.jobId);
+          let jobData: any = null;
+          if (jobResponse?.data?.response) {
+            jobData = jobResponse.data.response;
+          } else if (jobResponse?.data?.data) {
+            jobData = jobResponse.data.data;
+          } else if (jobResponse?.data?.jobId) {
+            jobData = jobResponse.data;
+          }
+          
+          if (jobData) {
+            // Include all job statuses (open, in_progress, completed, cancelled)
+            jobsList.push({
+              jobId: jobData.jobId,
+              title: jobData.title,
+              description: jobData.description || "",
+              budget: jobData.budget,
+              city: jobData.city,
+              province: jobData.province,
+              requiredSkills: jobData.requiredSkills,
+              requiredExpertise: jobData.requiredExpertise,
+              status: jobData.status, // Job status: open, in_progress, completed, cancelled
+              applicationsCount: jobData.applicationsCount || 0,
+              deadline: jobData.deadline,
+              jobType: jobData.jobType,
+              estimatedHours: jobData.estimatedHours,
+              customerId: jobData.customerId,
+              createdAt: jobData.createdAt,
+              employmentStatus: app.status?.toLowerCase(), // Application status: pending, accepted, rejected, withdrawn
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to fetch job ${app.jobId}:`, err);
+        }
+      }
       
       setEmployedJobs(jobsList);
     } catch (error) {
       console.error("Load employed jobs error:", error);
+    } finally {
+      setLoadingApplications(false);
     }
   };
 
@@ -247,14 +335,243 @@ const BrowseJobs = () => {
 
   const displayJobs = getDisplayJobs();
   const filteredDisplayJobs = displayJobs.filter((job) => {
-    if (searchQuery) {
-      const matchesSearch = 
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.description.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesSearch) return false;
-    }
-    if (statusFilter && statusFilter !== "all") {
-      if (job.status !== statusFilter) return false;
+    // Apply filters based on active tab
+    if (activeTab === "my-jobs") {
+      // Search filter
+      if (myJobsSearchQuery) {
+        const searchLower = myJobsSearchQuery.toLowerCase();
+        if (!job.title.toLowerCase().includes(searchLower) &&
+            !job.description.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (myJobsStatusFilter !== "all" && job.status !== myJobsStatusFilter) {
+        return false;
+      }
+      
+      // Budget filter
+      if (myJobsBudgetFilter !== "all") {
+        const budget = job.budget;
+        switch (myJobsBudgetFilter) {
+          case "0-5000":
+            if (budget > 5000) return false;
+            break;
+          case "5000-10000":
+            if (budget < 5000 || budget > 10000) return false;
+            break;
+          case "10000-25000":
+            if (budget < 10000 || budget > 25000) return false;
+            break;
+          case "25000-50000":
+            if (budget < 25000 || budget > 50000) return false;
+            break;
+          case "50000+":
+            if (budget < 50000) return false;
+            break;
+        }
+      }
+      
+      // Location filter
+      if (myJobsLocationFilter) {
+        const locationLower = myJobsLocationFilter.toLowerCase();
+        const cityMatch = job.city && job.city.toLowerCase().includes(locationLower);
+        const provinceMatch = job.province && job.province.toLowerCase().includes(locationLower);
+        if (!cityMatch && !provinceMatch) return false;
+      }
+      
+      // Date filter
+      if (myJobsDateFilter !== "all") {
+        const jobDate = new Date(job.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        switch (myJobsDateFilter) {
+          case "today":
+            if (jobDate < today) return false;
+            break;
+          case "week":
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            if (jobDate < weekAgo) return false;
+            break;
+          case "month":
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            if (jobDate < monthAgo) return false;
+            break;
+          case "3months":
+            const threeMonthsAgo = new Date(today);
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            if (jobDate < threeMonthsAgo) return false;
+            break;
+          case "year":
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+            if (jobDate < yearAgo) return false;
+            break;
+        }
+      }
+    } else if (activeTab === "employed") {
+      // Employments tab filters
+      if (employedSearchQuery) {
+        const searchLower = employedSearchQuery.toLowerCase();
+        if (!job.title.toLowerCase().includes(searchLower) &&
+            !job.description.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      // Task status filter (job status)
+      if (employedTaskStatusFilter !== "all" && job.status !== employedTaskStatusFilter) {
+        return false;
+      }
+      
+      // Employment status filter (application status)
+      if (employedEmploymentStatusFilter !== "all") {
+        const employmentStatus = job.employmentStatus || "";
+        if (employmentStatus !== employedEmploymentStatusFilter) {
+          return false;
+        }
+      }
+      
+      // Budget filter
+      if (employedBudgetFilter !== "all") {
+        const budget = job.budget;
+        switch (employedBudgetFilter) {
+          case "0-5000":
+            if (budget > 5000) return false;
+            break;
+          case "5000-10000":
+            if (budget < 5000 || budget > 10000) return false;
+            break;
+          case "10000-25000":
+            if (budget < 10000 || budget > 25000) return false;
+            break;
+          case "25000-50000":
+            if (budget < 25000 || budget > 50000) return false;
+            break;
+          case "50000+":
+            if (budget < 50000) return false;
+            break;
+        }
+      }
+      
+      // Location filter
+      if (employedLocationFilter) {
+        const locationLower = employedLocationFilter.toLowerCase();
+        const cityMatch = job.city && job.city.toLowerCase().includes(locationLower);
+        const provinceMatch = job.province && job.province.toLowerCase().includes(locationLower);
+        if (!cityMatch && !provinceMatch) return false;
+      }
+      
+      // Date filter
+      if (employedDateFilter !== "all") {
+        const jobDate = new Date(job.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        switch (employedDateFilter) {
+          case "today":
+            if (jobDate < today) return false;
+            break;
+          case "week":
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            if (jobDate < weekAgo) return false;
+            break;
+          case "month":
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            if (jobDate < monthAgo) return false;
+            break;
+          case "3months":
+            const threeMonthsAgo = new Date(today);
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            if (jobDate < threeMonthsAgo) return false;
+            break;
+          case "year":
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+            if (jobDate < yearAgo) return false;
+            break;
+        }
+      }
+    } else {
+      // Browse tab filters
+      if (searchQuery) {
+        const matchesSearch = 
+          job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.description.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!matchesSearch) return false;
+      }
+      if (statusFilter && statusFilter !== "all") {
+        if (job.status !== statusFilter) return false;
+      }
+      
+      // Budget filter
+      if (browseBudgetFilter !== "all") {
+        const budget = job.budget;
+        switch (browseBudgetFilter) {
+          case "0-5000":
+            if (budget > 5000) return false;
+            break;
+          case "5000-10000":
+            if (budget < 5000 || budget > 10000) return false;
+            break;
+          case "10000-25000":
+            if (budget < 10000 || budget > 25000) return false;
+            break;
+          case "25000-50000":
+            if (budget < 25000 || budget > 50000) return false;
+            break;
+          case "50000+":
+            if (budget < 50000) return false;
+            break;
+        }
+      }
+      
+      // Location filter
+      if (browseLocationFilter) {
+        const locationLower = browseLocationFilter.toLowerCase();
+        const cityMatch = job.city && job.city.toLowerCase().includes(locationLower);
+        const provinceMatch = job.province && job.province.toLowerCase().includes(locationLower);
+        if (!cityMatch && !provinceMatch) return false;
+      }
+      
+      // Date filter
+      if (browseDateFilter !== "all") {
+        const jobDate = new Date(job.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        switch (browseDateFilter) {
+          case "today":
+            if (jobDate < today) return false;
+            break;
+          case "week":
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            if (jobDate < weekAgo) return false;
+            break;
+          case "month":
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            if (jobDate < monthAgo) return false;
+            break;
+          case "3months":
+            const threeMonthsAgo = new Date(today);
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            if (jobDate < threeMonthsAgo) return false;
+            break;
+          case "year":
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+            if (jobDate < yearAgo) return false;
+            break;
+        }
+      }
     }
     return true;
   });
@@ -279,7 +596,7 @@ const BrowseJobs = () => {
               {activeTab === "browse" && "Find the perfect job for your skills"}
               {activeTab === "my-jobs" && "Manage your posted jobs"}
               {activeTab === "applications" && "Track your job applications"}
-              {activeTab === "employed" && "Jobs you're currently working on"}
+              {activeTab === "employed" && "Your employments"}
             </p>
           </div>
           {isCustomer && activeTab === "browse" && (
@@ -330,7 +647,7 @@ const BrowseJobs = () => {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <FiBriefcase />
-                    Employed ({employedJobs.length})
+                    Employments ({employedJobs.length})
                   </div>
                 </button>
               </>
@@ -352,6 +669,116 @@ const BrowseJobs = () => {
             )}
           </div>
         </div>
+
+        {/* Search and Filters - My Jobs Tab */}
+        {activeTab === "my-jobs" && (
+          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search jobs by title or description..."
+                  value={myJobsSearchQuery}
+                  onChange={(e) => setMyJobsSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                onClick={() => setShowMyJobsFilters(!showMyJobsFilters)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              >
+                <FiFilter />
+                Filters
+              </button>
+            </div>
+
+            {showMyJobsFilters && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={myJobsStatusFilter}
+                      onChange={(e) => setMyJobsStatusFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by status"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  {/* Budget Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Budget</label>
+                    <select
+                      value={myJobsBudgetFilter}
+                      onChange={(e) => setMyJobsBudgetFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by budget"
+                    >
+                      <option value="all">All Budgets</option>
+                      <option value="0-5000">₱0 - ₱5,000</option>
+                      <option value="5000-10000">₱5,000 - ₱10,000</option>
+                      <option value="10000-25000">₱10,000 - ₱25,000</option>
+                      <option value="25000-50000">₱25,000 - ₱50,000</option>
+                      <option value="50000+">₱50,000+</option>
+                    </select>
+                  </div>
+
+                  {/* Location Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <input
+                      type="text"
+                      placeholder="City/Municipality or Province"
+                      value={myJobsLocationFilter}
+                      onChange={(e) => setMyJobsLocationFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Date Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <select
+                      value={myJobsDateFilter}
+                      onChange={(e) => setMyJobsDateFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by date"
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="3months">Last 3 Months</option>
+                      <option value="year">This Year</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setMyJobsSearchQuery("");
+                      setMyJobsStatusFilter("all");
+                      setMyJobsBudgetFilter("all");
+                      setMyJobsLocationFilter("");
+                      setMyJobsDateFilter("all");
+                    }}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Search and Filters - Only show for browse tab */}
         {activeTab === "browse" && (
@@ -378,28 +805,319 @@ const BrowseJobs = () => {
 
             {showFilters && (
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex flex-wrap gap-4">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg"
-                    aria-label="Filter jobs by status"
-                    title="Filter jobs by status"
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by status"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  {/* Budget Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Budget</label>
+                    <select
+                      value={browseBudgetFilter}
+                      onChange={(e) => setBrowseBudgetFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by budget"
+                    >
+                      <option value="all">All Budgets</option>
+                      <option value="0-5000">₱0 - ₱5,000</option>
+                      <option value="5000-10000">₱5,000 - ₱10,000</option>
+                      <option value="10000-25000">₱10,000 - ₱25,000</option>
+                      <option value="25000-50000">₱25,000 - ₱50,000</option>
+                      <option value="50000+">₱50,000+</option>
+                    </select>
+                  </div>
+
+                  {/* Location Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <input
+                      type="text"
+                      placeholder="City/Municipality or Province"
+                      value={browseLocationFilter}
+                      onChange={(e) => setBrowseLocationFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Date Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <select
+                      value={browseDateFilter}
+                      onChange={(e) => setBrowseDateFilter(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      aria-label="Filter jobs by date"
+                    >
+                      <option value="all">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="3months">Last 3 Months</option>
+                      <option value="year">This Year</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("all");
+                      setBrowseBudgetFilter("all");
+                      setBrowseLocationFilter("");
+                      setBrowseDateFilter("all");
+                    }}
+                    className="text-sm text-blue-600 hover:underline"
                   >
-                    <option value="all">All Status</option>
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
+                    Clear all filters
+                  </button>
                 </div>
               </div>
             )}
           </div>
         )}
 
+        {/* Employments Tab Content */}
+        {activeTab === "employed" && (
+          <div className="mb-6">
+            {/* Search and Filters for Employments */}
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search jobs by title or description..."
+                    value={employedSearchQuery}
+                    onChange={(e) => setEmployedSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowEmployedFilters(!showEmployedFilters)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FiFilter />
+                  Filters
+                </button>
+              </div>
+
+              {showEmployedFilters && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {/* Task Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Task Status</label>
+                      <select
+                        value={employedTaskStatusFilter}
+                        onChange={(e) => setEmployedTaskStatusFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter jobs by task status"
+                      >
+                        <option value="all">All Task Status</option>
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Employment Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employment Status</label>
+                      <select
+                        value={employedEmploymentStatusFilter}
+                        onChange={(e) => setEmployedEmploymentStatusFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter jobs by employment status"
+                      >
+                        <option value="all">All Employment Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Fired</option>
+                        <option value="withdrawn">Resigned</option>
+                      </select>
+                    </div>
+
+                    {/* Budget Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Budget</label>
+                      <select
+                        value={employedBudgetFilter}
+                        onChange={(e) => setEmployedBudgetFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter jobs by budget"
+                      >
+                        <option value="all">All Budgets</option>
+                        <option value="0-5000">₱0 - ₱5,000</option>
+                        <option value="5000-10000">₱5,000 - ₱10,000</option>
+                        <option value="10000-25000">₱10,000 - ₱25,000</option>
+                        <option value="25000-50000">₱25,000 - ₱50,000</option>
+                        <option value="50000+">₱50,000+</option>
+                      </select>
+                    </div>
+
+                    {/* Location Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <input
+                        type="text"
+                        placeholder="City/Municipality or Province"
+                        value={employedLocationFilter}
+                        onChange={(e) => setEmployedLocationFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Date Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                      <select
+                        value={employedDateFilter}
+                        onChange={(e) => setEmployedDateFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter jobs by date"
+                      >
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="3months">Last 3 Months</option>
+                        <option value="year">This Year</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => {
+                        setEmployedSearchQuery("");
+                        setEmployedTaskStatusFilter("all");
+                        setEmployedEmploymentStatusFilter("all");
+                        setEmployedBudgetFilter("all");
+                        setEmployedLocationFilter("");
+                        setEmployedDateFilter("all");
+                      }}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Applications Tab Content */}
         {activeTab === "applications" && (
           <div className="mb-6">
+            {/* Search and Filters for Applications */}
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search applications by job title..."
+                    value={applicationSearchQuery}
+                    onChange={(e) => setApplicationSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowApplicationFilters(!showApplicationFilters)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FiFilter />
+                  Filters
+                </button>
+              </div>
+
+              {showApplicationFilters && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={applicationStatusFilter}
+                        onChange={(e) => setApplicationStatusFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter applications by status"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="withdrawn">Withdrawn</option>
+                      </select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                      <select
+                        value={applicationDateFilter}
+                        onChange={(e) => setApplicationDateFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter applications by date"
+                      >
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="3months">Last 3 Months</option>
+                        <option value="year">This Year</option>
+                      </select>
+                    </div>
+
+                    {/* Budget Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Budget</label>
+                      <select
+                        value={applicationBudgetFilter}
+                        onChange={(e) => setApplicationBudgetFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filter applications by budget"
+                      >
+                        <option value="all">All Budgets</option>
+                        <option value="0-5000">₱0 - ₱5,000</option>
+                        <option value="5000-10000">₱5,000 - ₱10,000</option>
+                        <option value="10000-25000">₱10,000 - ₱25,000</option>
+                        <option value="25000-50000">₱25,000 - ₱50,000</option>
+                        <option value="50000+">₱50,000+</option>
+                      </select>
+                    </div>
+
+                    {/* Location Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <input
+                        type="text"
+                        placeholder="City or Province"
+                        value={applicationLocationFilter}
+                        onChange={(e) => setApplicationLocationFilter(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {loadingApplications ? (
               <div className="text-center py-8">Loading applications...</div>
             ) : applications.length === 0 ? (
@@ -416,38 +1134,197 @@ const BrowseJobs = () => {
                   Browse Jobs
                 </Link>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {applications.map((app) => {
-                  const job = jobs.find((j) => j.jobId === app.jobId);
-                  if (!job) return null;
-                  return (
-                    <Link
+            ) : (() => {
+              // Filter applications
+              const filteredApplications = applications.filter((app) => {
+                const job = jobs.find((j) => j.jobId === app.jobId);
+                if (!job) return false;
+
+                // Search filter
+                if (applicationSearchQuery) {
+                  const searchLower = applicationSearchQuery.toLowerCase();
+                  if (!job.title.toLowerCase().includes(searchLower) &&
+                      !(app.coverLetter && app.coverLetter.toLowerCase().includes(searchLower))) {
+                    return false;
+                  }
+                }
+
+                // Status filter
+                if (applicationStatusFilter !== "all" && app.status !== applicationStatusFilter) {
+                  return false;
+                }
+
+                // Date filter
+                if (applicationDateFilter !== "all") {
+                  const appDate = new Date(app.createdAt);
+                  const now = new Date();
+                  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  
+                  switch (applicationDateFilter) {
+                    case "today":
+                      if (appDate < today) return false;
+                      break;
+                    case "week":
+                      const weekAgo = new Date(today);
+                      weekAgo.setDate(weekAgo.getDate() - 7);
+                      if (appDate < weekAgo) return false;
+                      break;
+                    case "month":
+                      const monthAgo = new Date(today);
+                      monthAgo.setMonth(monthAgo.getMonth() - 1);
+                      if (appDate < monthAgo) return false;
+                      break;
+                    case "3months":
+                      const threeMonthsAgo = new Date(today);
+                      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                      if (appDate < threeMonthsAgo) return false;
+                      break;
+                    case "year":
+                      const yearAgo = new Date(today);
+                      yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+                      if (appDate < yearAgo) return false;
+                      break;
+                  }
+                }
+
+                // Budget filter
+                if (applicationBudgetFilter !== "all") {
+                  const budget = job.budget;
+                  switch (applicationBudgetFilter) {
+                    case "0-5000":
+                      if (budget > 5000) return false;
+                      break;
+                    case "5000-10000":
+                      if (budget < 5000 || budget > 10000) return false;
+                      break;
+                    case "10000-25000":
+                      if (budget < 10000 || budget > 25000) return false;
+                      break;
+                    case "25000-50000":
+                      if (budget < 25000 || budget > 50000) return false;
+                      break;
+                    case "50000+":
+                      if (budget < 50000) return false;
+                      break;
+                  }
+                }
+
+                // Location filter
+                if (applicationLocationFilter) {
+                  const locationLower = applicationLocationFilter.toLowerCase();
+                  const cityMatch = job.city && job.city.toLowerCase().includes(locationLower);
+                  const provinceMatch = job.province && job.province.toLowerCase().includes(locationLower);
+                  if (!cityMatch && !provinceMatch) return false;
+                }
+
+                return true;
+              });
+
+              return filteredApplications.length === 0 ? (
+                <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                  <p className="text-gray-500">No applications match your filters</p>
+                  <button
+                    onClick={() => {
+                      setApplicationSearchQuery("");
+                      setApplicationStatusFilter("all");
+                      setApplicationDateFilter("all");
+                      setApplicationBudgetFilter("all");
+                      setApplicationLocationFilter("");
+                    }}
+                    className="mt-4 text-blue-600 hover:underline"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredApplications.map((app) => {
+                    const job = jobs.find((j) => j.jobId === app.jobId);
+                    if (!job) return null;
+                    return (
+                    <div
                       key={app.applicationId}
-                      to={`/jobs/${job.jobId}`}
-                      className="block bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition"
+                      className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-2">{job.title}</h3>
-                          <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                            <span className="font-semibold text-gray-900">₱{job.budget.toLocaleString()}</span>
-                            <span className={`px-2 py-1 text-xs font-medium rounded ${
+                      <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+                        <div className="flex-1 w-full">
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">{job.title}</h3>
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-semibold text-gray-700">₱</span>
+                              <span className="font-semibold text-gray-900">{job.budget.toLocaleString()}</span>
+                            </div>
+                            {(job.city || job.province) && (
+                              <div className="flex items-center gap-2">
+                                <FiMapPin className="w-4 h-4 text-gray-500" />
+                                <span>
+                                  {job.city && job.province
+                                    ? `${job.city}, ${job.province}`
+                                    : job.city || job.province}
+                                </span>
+                              </div>
+                            )}
+                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                               app.status === "pending" ? "bg-yellow-100 text-yellow-800" :
                               app.status === "accepted" ? "bg-green-100 text-green-800" :
                               app.status === "rejected" ? "bg-red-100 text-red-800" :
+                              app.status === "withdrawn" ? "bg-gray-100 text-gray-800" :
                               "bg-gray-100 text-gray-800"
                             }`}>
-                              {app.status}
+                              {app.status.toUpperCase()}
                             </span>
+                          </div>
+                          {app.coverLetter && (
+                            <p className="text-gray-600 text-sm line-clamp-2 mt-2">
+                              {app.coverLetter}
+                            </p>
+                          )}
+                          <div className="text-xs text-gray-500 mt-2">
+                            Applied on {new Date(app.createdAt).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
-                    </Link>
+
+                      {/* Actions */}
+                      <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-gray-200">
+                        <button
+                          onClick={async () => {
+                            setViewingApplication(app);
+                            setViewingJob(job);
+                            setCurrentMatchPercentage(null);
+                            
+                            // Fetch current match percentage
+                            if (user?.userId) {
+                              try {
+                                const matchResponse = await getMatchPercentage(job.jobId, user.userId);
+                                const matchData = matchResponse?.data?.response || matchResponse?.data?.data || matchResponse?.data;
+                                if (matchData?.matchPercentage !== undefined) {
+                                  setCurrentMatchPercentage(matchData.matchPercentage);
+                                }
+                              } catch (err) {
+                                console.error("Failed to fetch match percentage:", err);
+                              }
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm shadow-sm"
+                        >
+                          <FiEye className="w-4 h-4" />
+                          View Application
+                        </button>
+                        <Link
+                          to={`/jobs/${job.jobId}`}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+                        >
+                          <FiEye className="w-4 h-4" />
+                          View Job
+                        </Link>
+                      </div>
+                    </div>
                   );
-                })}
-              </div>
-            )}
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -461,7 +1338,7 @@ const BrowseJobs = () => {
                 <p className="text-gray-500 text-base sm:text-lg">
                   {activeTab === "browse" && "No jobs found"}
                   {activeTab === "my-jobs" && "You haven't posted any jobs yet"}
-                  {activeTab === "employed" && "You are not currently employed in any jobs"}
+                  {activeTab === "employed" && "You have no employments"}
                 </p>
               </div>
             ) : (
@@ -503,9 +1380,9 @@ const BrowseJobs = () => {
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <FiDollarSign />
+                    <span className="text-lg font-semibold text-gray-700">₱</span>
                     <span className="font-semibold text-gray-900">
-                      ₱{job.budget.toLocaleString()}
+                      {job.budget.toLocaleString()}
                     </span>
                   </div>
                   {(job.city || job.province) && (
@@ -526,6 +1403,13 @@ const BrowseJobs = () => {
                   )}
                 </div>
 
+                {job.requiredExpertise && (
+                  <div className="mb-4">
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded font-medium">
+                      {job.requiredExpertise}
+                    </span>
+                  </div>
+                )}
                 {job.requiredSkills && job.requiredSkills.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
                     {job.requiredSkills.slice(0, 3).map((skill, idx) => (
@@ -552,13 +1436,16 @@ const BrowseJobs = () => {
                   <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
                     {job.status === "open" && (
                       <>
-                        <Link
-                          to={`/jobs/${job.jobId}/edit`}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(`/jobs/${job.jobId}/edit`);
+                          }}
                           className="flex-1 text-center px-3 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition text-sm"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           Edit
-                        </Link>
+                        </button>
                         <button
                           onClick={async (e) => {
                             e.preventDefault();
@@ -580,13 +1467,16 @@ const BrowseJobs = () => {
                         </button>
                       </>
                     )}
-                    <Link
-                      to={`/jobs/${job.jobId}`}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate(`/jobs/${job.jobId}`);
+                      }}
                       className="flex-1 text-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       View
-                    </Link>
+                    </button>
                   </div>
                 )}
               </Link>
@@ -596,6 +1486,171 @@ const BrowseJobs = () => {
           </>
         )}
       </div>
+
+      {/* View Application Modal */}
+      {viewingApplication && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Application Details</h2>
+                <button
+                  onClick={() => {
+                    setViewingApplication(null);
+                    setViewingJob(null);
+                    setCurrentMatchPercentage(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition"
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
+              </div>
+
+              {viewingJob && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{viewingJob.title}</h3>
+                  <div className="flex flex-col gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-700">Budget:</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg font-semibold text-gray-700">₱</span>
+                        <span className="font-semibold text-gray-900">
+                          {viewingJob.budget.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    {(viewingJob.city || viewingJob.province) && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-700">Location:</span>
+                        <div className="flex items-center gap-1">
+                          <FiMapPin className="w-4 h-4 text-gray-500" />
+                          <span>
+                            {viewingJob.city && viewingJob.province
+                              ? `${viewingJob.city}, ${viewingJob.province}`
+                              : viewingJob.city || viewingJob.province}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {(currentMatchPercentage !== null || (viewingApplication.matchPercentage !== undefined && viewingApplication.matchPercentage !== null)) && (
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {(currentMatchPercentage !== null ? currentMatchPercentage : viewingApplication.matchPercentage)}% Match
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Application Status</label>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      viewingApplication.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                      viewingApplication.status === "accepted" ? "bg-green-100 text-green-800" :
+                      viewingApplication.status === "rejected" ? "bg-red-100 text-red-800" :
+                      viewingApplication.status === "withdrawn" ? "bg-gray-100 text-gray-800" :
+                      "bg-gray-100 text-gray-800"
+                    }`}>
+                      {viewingApplication.status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Application ID</label>
+                  <p className="text-gray-900">#{viewingApplication.applicationId}</p>
+                </div>
+
+                {viewingApplication.coverLetter && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Letter</label>
+                    <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
+                      {viewingApplication.coverLetter}
+                    </p>
+                  </div>
+                )}
+
+                {viewingApplication.proposedBudget && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proposed Budget</label>
+                    <p className="text-gray-900">
+                      <span className="text-lg font-semibold text-gray-700">₱</span>
+                      <span className="font-semibold text-gray-900">
+                        {viewingApplication.proposedBudget.toLocaleString()}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Applied On</label>
+                  <p className="text-gray-900">
+                    {new Date(viewingApplication.createdAt).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+
+                {viewingApplication.status?.toLowerCase() === "accepted" && viewingApplication.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hired On</label>
+                    <p className="text-gray-900">
+                      {new Date(viewingApplication.updatedAt).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {viewingApplication.status?.toLowerCase() === "rejected" && viewingApplication.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rejected On</label>
+                    <p className="text-gray-900">
+                      {new Date(viewingApplication.updatedAt).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200 flex gap-3">
+                <Link
+                  to={`/jobs/${viewingApplication.jobId}`}
+                  className="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                >
+                  View Job
+                </Link>
+                <button
+                  onClick={() => {
+                    setViewingApplication(null);
+                    setViewingJob(null);
+                    setCurrentMatchPercentage(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

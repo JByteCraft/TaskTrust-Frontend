@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiEdit, FiTrash2, FiEye, FiUsers, FiDollarSign, FiMapPin, FiClock, FiX } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiEye, FiUsers, FiMapPin, FiClock, FiX } from "react-icons/fi";
 import { getMyJobs, deleteJob, updateJob } from "../../lib/api/jobs.api";
 import { getJobApplications } from "../../lib/api/applications.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
@@ -319,9 +319,9 @@ const MyJobs = () => {
                     </p>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
-                        <FiDollarSign />
+                        <span className="text-lg font-semibold text-gray-700">₱</span>
                         <span className="font-semibold text-gray-900">
-                          ₱{job.budget.toLocaleString()}
+                          {job.budget.toLocaleString()}
                         </span>
                       </div>
                       {(job.city || job.province) && (

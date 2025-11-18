@@ -568,6 +568,7 @@ const Profile = () => {
     }
     try {
       const { generateResume } = await import("../../lib/api/resume.api");
+      const { default: jsPDF } = await import("jspdf");
       const response = await generateResume(targetUserId);
       // fetch.utils returns: { status, response, message }
       // For resume: response.response = { resume: {...} }
@@ -586,60 +587,147 @@ const Profile = () => {
         throw new Error("Failed to generate resume data");
       }
 
-      // Simple text-based resume generation (can be enhanced with PDF library)
-      const resumeText = `
-RESUME
-${"=".repeat(50)}
+      // Generate PDF
+      const doc = new jsPDF();
+      let yPos = 20;
 
-${resumeData.personalInfo.name}
-${resumeData.personalInfo.email}
-${resumeData.personalInfo.phone || ""}
-${resumeData.personalInfo.address || ""}
+      // Header
+      doc.setFontSize(20);
+      doc.setFont("helvetica", "bold");
+      doc.text(resumeData.personalInfo.name, 20, yPos);
+      yPos += 10;
 
-PROFESSIONAL SUMMARY
-${"-".repeat(50)}
-${resumeData.personalInfo.bio || "No summary provided"}
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(resumeData.personalInfo.email, 20, yPos);
+      yPos += 5;
+      if (resumeData.personalInfo.phone) {
+        doc.text(resumeData.personalInfo.phone, 20, yPos);
+        yPos += 5;
+      }
+      if (resumeData.personalInfo.address) {
+        doc.text(resumeData.personalInfo.address, 20, yPos);
+        yPos += 10;
+      }
 
-SKILLS
-${"-".repeat(50)}
-${resumeData.skills?.join(", ") || "No skills listed"}
+      // Professional Summary
+      if (resumeData.personalInfo.bio) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Professional Summary", 20, yPos);
+        yPos += 7;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const bioLines = doc.splitTextToSize(resumeData.personalInfo.bio, 170);
+        doc.text(bioLines, 20, yPos);
+        yPos += bioLines.length * 5 + 5;
+      }
 
-CERTIFICATIONS
-${"-".repeat(50)}
-${resumeData.certifications?.map((c: any) => 
-  `• ${c.title}${c.issuer ? ` - ${c.issuer}` : ""}${c.date ? ` (${new Date(c.date).toLocaleDateString()})` : ""}`
-).join("\n") || "No certifications"}
+      // Skills
+      if (resumeData.skills && resumeData.skills.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Skills", 20, yPos);
+        yPos += 7;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(resumeData.skills.join(", "), 20, yPos);
+        yPos += 10;
+      }
 
-PROJECTS
-${"-".repeat(50)}
-${resumeData.projects?.map((p: any) => 
-  `• ${p.title}${p.company ? ` - ${p.company}` : ""}${p.date ? ` (${new Date(p.date).toLocaleDateString()})` : ""}${p.description ? `\n  ${p.description}` : ""}`
-).join("\n\n") || "No projects"}
+      // Certifications
+      if (resumeData.certifications && resumeData.certifications.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Certifications", 20, yPos);
+        yPos += 7;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        resumeData.certifications.forEach((cert: any) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(cert.title, 20, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          if (cert.issuer) {
+            doc.text(`Issued by: ${cert.issuer}`, 20, yPos);
+            yPos += 5;
+          }
+          if (cert.date) {
+            doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPos);
+            yPos += 5;
+          }
+          yPos += 3;
+        });
+        yPos += 5;
+      }
 
-WORK EXPERIENCE
-${"-".repeat(50)}
-${resumeData.workExperience?.map((job: any) => 
-  `• ${job.title}${job.company ? ` at ${job.company}` : ""}${job.date ? ` (${new Date(job.date).toLocaleDateString()})` : ""}${job.description ? `\n  ${job.description}` : ""}`
-).join("\n\n") || "No work experience"}
+      // Work Experience (includes both completed jobs and projects)
+      if (resumeData.workExperience && resumeData.workExperience.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Work Experience", 20, yPos);
+        yPos += 7;
+        doc.setFontSize(10);
+        resumeData.workExperience.forEach((exp: any) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(exp.title, 20, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          doc.text(exp.company, 20, yPos);
+          yPos += 5;
+          if (exp.dateStarted || exp.dateEnd) {
+            const startDate = exp.dateStarted ? new Date(exp.dateStarted).toLocaleDateString() : '';
+            const endDate = exp.dateEnd ? new Date(exp.dateEnd).toLocaleDateString() : 'Present';
+            doc.text(`${startDate} - ${endDate}`, 20, yPos);
+            yPos += 5;
+          } else if (exp.date) {
+            doc.text(new Date(exp.date).toLocaleDateString(), 20, yPos);
+            yPos += 5;
+          }
+          if (exp.description) {
+            const descLines = doc.splitTextToSize(exp.description, 170);
+            doc.text(descLines, 20, yPos);
+            yPos += descLines.length * 5;
+          }
+          if (exp.skills && exp.skills.length > 0) {
+            doc.text(`Skills: ${exp.skills.join(", ")}`, 20, yPos);
+            yPos += 5;
+          }
+          yPos += 3;
+        });
+        yPos += 5;
+      }
 
-REVIEWS & RATINGS
-${"-".repeat(50)}
-Average Rating: ${resumeData.reviews?.averageRating || 0}/5
-Total Reviews: ${resumeData.reviews?.totalReviews || 0}
-      `.trim();
+      // Education
+      if (resumeData.education && resumeData.education.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Education", 20, yPos);
+        yPos += 7;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        resumeData.education.forEach((edu: any) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(edu.school || "School", 20, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          if (edu.degree) {
+            doc.text(edu.degree, 20, yPos);
+            yPos += 5;
+          }
+          if (edu.dateStarted || edu.dateEnded) {
+            const startDate = edu.dateStarted ? new Date(edu.dateStarted).toLocaleDateString() : '';
+            const endDate = edu.dateEnded ? new Date(edu.dateEnded).toLocaleDateString() : 'Present';
+            doc.text(`${startDate} - ${endDate}`, 20, yPos);
+            yPos += 5;
+          }
+          yPos += 3;
+        });
+        yPos += 5;
+      }
 
-      // Create and download text file
-      const blob = new Blob([resumeText], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${resumeData.personalInfo.name.replace(/\s+/g, "_")}_Resume.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      alert("Resume downloaded successfully!");
+      // Save PDF
+      doc.save(`${resumeData.personalInfo.name.replace(/\s+/g, "_")}_Resume.pdf`);
     } catch (error: any) {
       console.error("Generate resume error:", error);
       alert(error.response?.data?.message || "Failed to generate resume");
@@ -683,7 +771,19 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
         token || undefined
       );
 
-      if (response?.status === 200 || response?.data || response?.user) {
+      console.log("Update profile response:", response);
+
+      // Backend returns: { status: 200, response: {...}, message: '...' }
+      // Check for successful response - be more lenient to catch all success cases
+      const hasResponseData = response?.response && typeof response.response === 'object';
+      const hasResponseUserId = hasResponseData && response.response.userId;
+      const hasStatus200 = response?.status === 200;
+      const hasData = response?.data && typeof response.data === 'object';
+      const hasUser = response?.user;
+      
+      const isSuccess = hasStatus200 || hasResponseUserId || hasData || hasUser;
+
+      if (isSuccess) {
         // If ID verification fields are present and complete, submit for verification
         if (
           resolvedUserId &&
@@ -708,11 +808,20 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
           }
         }
         
-        // Close modal and reload profile data
+        // Close modal first
         setShowEditModal(false);
+        
+        // Show success message
+        alert("Profile updated successfully!");
         
         // Refetch profile to ensure all data is up-to-date
         await fetchProfile();
+      } else {
+        // If response doesn't indicate success, show error but don't close modal
+        const errorMessage = response?.message || response?.error?.message || response?.error || "Failed to update profile. Please try again.";
+        console.error("Update profile failed:", response);
+        alert(errorMessage);
+        throw new Error(errorMessage); // Throw to be caught by catch block
       }
     } catch (err: any) {
       console.error("Update profile error:", err);
@@ -1590,7 +1699,7 @@ Total Reviews: ${resumeData.reviews?.totalReviews || 0}
             dateOfBirth: rawUserData.dateOfBirth
               ? new Date(rawUserData.dateOfBirth).toISOString().split("T")[0]
               : "",
-            expertise: rawUserData.expertise || "",
+            expertise: Array.isArray(rawUserData.expertise) ? rawUserData.expertise : (rawUserData.expertise ? [rawUserData.expertise] : []),
             bio: rawUserData.bio || "",
             skills: rawUserData.skills || [],
             street: rawUserData.street || "",

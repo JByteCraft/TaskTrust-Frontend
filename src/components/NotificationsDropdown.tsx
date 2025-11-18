@@ -8,6 +8,7 @@ import {
   markAllNotificationsAsRead,
   deleteNotification,
 } from "../lib/api/notifications.api";
+import { useWebSocket } from "../lib/hooks/useWebSocket";
 
 type Notification = {
   notificationId: number;
@@ -35,6 +36,20 @@ const NotificationsDropdown = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Real-time notification handler
+  const handleRealTimeNotification = (notification: Notification) => {
+    setNotifications((prev) => [notification, ...prev]);
+    setUnreadCount((prev) => prev + 1);
+    if (onUnreadCountChange) {
+      onUnreadCountChange(unreadCount + 1);
+    }
+  };
+
+  // Setup WebSocket for real-time notifications
+  useWebSocket({
+    onNotification: handleRealTimeNotification,
+  });
 
   useEffect(() => {
     if (isOpen) {

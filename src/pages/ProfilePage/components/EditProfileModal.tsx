@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { FiX, FiSave } from "react-icons/fi";
 import ImageUploadField from "./ImageUploadField";
 import { getAllSkills } from "../../../lib/api/skills.api";
+import { getAllExpertise } from "../../../lib/api/expertise.api";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface EditProfileModalProps {
     email: string;
     phoneNumber?: string;
     dateOfBirth?: string;
-    expertise?: string;
+    expertise?: string[];
     bio?: string;
     skills?: string[];
     street?: string;
@@ -50,10 +51,53 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const skillInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // Expertise states (similar to skills)
+  const [expertiseInput, setExpertiseInput] = useState("");
+  const [allExpertise, setAllExpertise] = useState<string[]>([]);
+  const [expertiseSuggestions, setExpertiseSuggestions] = useState<string[]>([]);
+  const [showExpertiseSuggestions, setShowExpertiseSuggestions] = useState(false);
+  const expertiseInputRef = useRef<HTMLInputElement>(null);
+  const expertiseSuggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // Track if modal was just opened to initialize formData only once
+  const prevIsOpenRef = useRef(false);
+  const initializedDataRef = useRef<string | null>(null);
 
+  // Only initialize formData when modal opens (not on every initialData change)
   useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
+    // When modal opens (isOpen changes from false to true)
+    if (isOpen && !prevIsOpenRef.current) {
+      // Ensure expertise is always an array when initializing
+      const normalizedInitialData = {
+        ...initialData,
+        expertise: Array.isArray(initialData.expertise) 
+          ? initialData.expertise 
+          : (initialData.expertise ? [initialData.expertise] : []),
+      };
+      
+      // Initialize formData with normalized initialData
+      const initialDataStr = JSON.stringify(normalizedInitialData);
+      setFormData(normalizedInitialData);
+      initializedDataRef.current = initialDataStr;
+    }
+    
+    // When modal closes, reset tracking
+    if (!isOpen && prevIsOpenRef.current) {
+      initializedDataRef.current = null;
+    }
+    
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialData]); // Include initialData but only initialize when modal opens
+
+  // Separate effect to handle initialData changes ONLY when modal is closed
+  // This ensures fresh data when modal reopens after save
+  useEffect(() => {
+    if (!isOpen) {
+      // Modal is closed, we can update the reference for next open
+      initializedDataRef.current = null;
+    }
+  }, [initialData, isOpen]);
 
   useEffect(() => {
     if (isTasker) {
@@ -75,6 +119,24 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
         }
       };
       loadSkills();
+      
+      const loadExpertise = async () => {
+        try {
+          const response = await getAllExpertise();
+          let expertiseData: string[] = [];
+          if (response?.response?.expertise && Array.isArray(response.response.expertise)) {
+            expertiseData = response.response.expertise;
+          } else if (Array.isArray(response?.response)) {
+            expertiseData = response.response;
+          } else if (Array.isArray(response?.expertise)) {
+            expertiseData = response.expertise;
+          }
+          setAllExpertise(expertiseData);
+        } catch (error) {
+          console.error("Load expertise error:", error);
+        }
+      };
+      loadExpertise();
     }
   }, [isTasker]);
 
@@ -87,6 +149,14 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
         !skillInputRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
+      }
+      if (
+        expertiseSuggestionsRef.current &&
+        !expertiseSuggestionsRef.current.contains(event.target as Node) &&
+        expertiseInputRef.current &&
+        !expertiseInputRef.current.contains(event.target as Node)
+      ) {
+        setShowExpertiseSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -154,13 +224,83 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
     }));
   };
 
+  // Expertise handlers (similar to skills)
+  const handleAddExpertise = () => {
+    const trimmedExpertise = expertiseInput.trim();
+    if (trimmedExpertise && !formData.expertise?.includes(trimmedExpertise)) {
+      setFormData((prev) => ({
+        ...prev,
+        expertise: [...(prev.expertise || []), trimmedExpertise],
+      }));
+      setExpertiseInput("");
+      setShowExpertiseSuggestions(false);
+      setExpertiseSuggestions([]);
+    }
+  };
+
+  const handleExpertiseInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setExpertiseInput(value);
+    
+    if (value.trim().length > 0) {
+      const filtered = allExpertise.filter((exp) =>
+        exp.toLowerCase().includes(value.toLowerCase()) &&
+        !formData.expertise?.includes(exp)
+      );
+      setExpertiseSuggestions(filtered.slice(0, 5));
+      setShowExpertiseSuggestions(filtered.length > 0);
+    } else {
+      setExpertiseSuggestions([]);
+      setShowExpertiseSuggestions(false);
+    }
+  };
+
+  const handleExpertiseSuggestionClick = (expertise: string) => {
+    if (!formData.expertise?.includes(expertise)) {
+      setFormData((prev) => ({
+        ...prev,
+        expertise: [...(prev.expertise || []), expertise],
+      }));
+      setExpertiseInput("");
+      setShowExpertiseSuggestions(false);
+      setExpertiseSuggestions([]);
+      if (expertiseInputRef.current) {
+        expertiseInputRef.current.focus();
+      }
+    }
+  };
+
+  const handleRemoveExpertise = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      expertise: prev.expertise?.filter((_, i) => i !== index) || [],
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (loading) return; // Prevent double submission
+    
+    // Ensure expertise is always an array (even if empty)
+    const cleanedFormData = {
+      ...formData,
+      expertise: Array.isArray(formData.expertise) ? formData.expertise : (formData.expertise ? [formData.expertise] : []),
+      skills: Array.isArray(formData.skills) ? formData.skills : (formData.skills ? [formData.skills] : []),
+    };
+    
     // Remove skills from formData if user is not a tasker
     const dataToSave = isTasker 
-      ? formData 
-      : { ...formData, skills: undefined };
-    await onSave(dataToSave);
+      ? cleanedFormData 
+      : { ...cleanedFormData, skills: undefined, expertise: undefined };
+    
+    try {
+      await onSave(dataToSave);
+      // onSave should handle closing the modal, but we can also close it here as fallback
+    } catch (error) {
+      console.error("Save error:", error);
+      // Error handling is done in onSave
+    }
   };
 
   return (
@@ -294,19 +434,79 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
                 Professional Information
               </h3>
               <div className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Expertise
-                  </label>
-                  <input
-                    type="text"
-                    name="expertise"
-                    value={formData.expertise || ""}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    placeholder="e.g. Web Development, Graphic Design, Plumbing"
-                  />
-                </div>
+                {/* Expertise - Only for Taskers */}
+                {isTasker && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Expertise
+                    </label>
+                    <div className="relative">
+                      <div className="flex gap-2">
+                        <input
+                          ref={expertiseInputRef}
+                          type="text"
+                          value={expertiseInput}
+                          onChange={handleExpertiseInputChange}
+                          onFocus={() => {
+                            if (expertiseSuggestions.length > 0) setShowExpertiseSuggestions(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddExpertise();
+                            }
+                          }}
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder="Add expertise (press Enter)"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddExpertise}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {showExpertiseSuggestions && expertiseSuggestions.length > 0 && (
+                        <div
+                          ref={expertiseSuggestionsRef}
+                          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {expertiseSuggestions.map((expertise, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleExpertiseSuggestionClick(expertise)}
+                              className="w-full text-left px-4 py-2 hover:bg-blue-50 transition"
+                            >
+                              {expertise}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {formData.expertise && formData.expertise.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {formData.expertise.map((expertise, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm text-green-700"
+                          >
+                            {expertise}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExpertise(index)}
+                              className="ml-1 rounded-full p-0.5 hover:bg-green-200"
+                              aria-label={`Remove ${expertise}`}
+                            >
+                              <FiX className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Professional Summary
@@ -427,7 +627,7 @@ const EditProfileModal: FC<EditProfileModalProps> = ({
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    City
+                    City/Municipality
                   </label>
                   <input
                     type="text"

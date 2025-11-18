@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiEye, FiX, FiCheckCircle, FiClock, FiDollarSign } from "react-icons/fi";
+import { FiEye, FiX, FiCheckCircle, FiClock } from "react-icons/fi";
 import { getMyApplications, deleteApplication, getApplications } from "../../lib/api/applications.api";
 import { getJob } from "../../lib/api/jobs.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
@@ -14,6 +14,7 @@ type Application = {
   status: string;
   matchPercentage?: number;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type Job = {
@@ -32,6 +33,8 @@ const MyApplications = () => {
   const [filter, setFilter] = useState<"all" | "pending" | "accepted" | "rejected" | "cancelled" | "employed">("all");
   const [employedJobs, setEmployedJobs] = useState<Job[]>([]);
   const [loadingEmployed, setLoadingEmployed] = useState(false);
+  const [viewingApplication, setViewingApplication] = useState<Application | null>(null);
+  const [viewingJob, setViewingJob] = useState<Job | null>(null);
 
   const user = getAuthenticatedUserFromToken<{ role: string }>();
 
@@ -415,9 +418,9 @@ const MyApplications = () => {
                       {job && (
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-2">
-                            <FiDollarSign />
+                            <span className="text-lg font-semibold text-gray-700">₱</span>
                             <span className="font-semibold text-gray-900">
-                              ₱{job.budget.toLocaleString()}
+                              {job.budget.toLocaleString()}
                             </span>
                           </div>
                           {app.proposedBudget && (
@@ -440,11 +443,21 @@ const MyApplications = () => {
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setViewingApplication(app);
+                        setViewingJob(job || null);
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm shadow-sm"
+                    >
+                      <FiEye className="w-4 h-4" />
+                      View Application
+                    </button>
                     <Link
                       to={`/jobs/${app.jobId}`}
-                      className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
                     >
-                      <FiEye />
+                      <FiEye className="w-4 h-4" />
                       View Job
                     </Link>
                     {app.status === "pending" && (
@@ -470,6 +483,149 @@ const MyApplications = () => {
           </div>
         )}
       </div>
+
+      {/* View Application Modal */}
+      {viewingApplication && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Application Details</h2>
+                <button
+                  onClick={() => {
+                    setViewingApplication(null);
+                    setViewingJob(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition"
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
+              </div>
+
+              {viewingJob && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{viewingJob.title}</h3>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold text-gray-700">₱</span>
+                      <span className="font-semibold text-gray-900">
+                        {viewingJob.budget.toLocaleString()}
+                      </span>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(viewingJob.status)}`}>
+                      {viewingJob.status}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Application Status</label>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 ${getStatusColor(viewingApplication.status)}`}>
+                      {getStatusIcon(viewingApplication.status)}
+                      {viewingApplication.status.toUpperCase()}
+                    </span>
+                    {viewingApplication.matchPercentage !== undefined && viewingApplication.matchPercentage !== null && (
+                      <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        {viewingApplication.matchPercentage}% Match
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Application ID</label>
+                  <p className="text-gray-900">#{viewingApplication.applicationId}</p>
+                </div>
+
+                {viewingApplication.coverLetter && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Letter</label>
+                    <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
+                      {viewingApplication.coverLetter}
+                    </p>
+                  </div>
+                )}
+
+                {viewingApplication.proposedBudget && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proposed Budget</label>
+                    <p className="text-gray-900">
+                      <span className="text-lg font-semibold text-gray-700">₱</span>
+                      <span className="font-semibold text-gray-900">
+                        {viewingApplication.proposedBudget.toLocaleString()}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Applied On</label>
+                  <p className="text-gray-900">
+                    {new Date(viewingApplication.createdAt).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+
+                {viewingApplication.status?.toLowerCase() === "accepted" && viewingApplication.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hired On</label>
+                    <p className="text-gray-900">
+                      {new Date(viewingApplication.updatedAt).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {viewingApplication.status?.toLowerCase() === "rejected" && viewingApplication.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rejected On</label>
+                    <p className="text-gray-900">
+                      {new Date(viewingApplication.updatedAt).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200 flex gap-3">
+                <Link
+                  to={`/jobs/${viewingApplication.jobId}`}
+                  className="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                >
+                  View Job
+                </Link>
+                <button
+                  onClick={() => {
+                    setViewingApplication(null);
+                    setViewingJob(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import {
   getMessages,
   sendMessage,
 } from "../../lib/api/messages.api";
+import { useWebSocket } from "../../lib/hooks/useWebSocket";
 
 const Messages: React.FC = () => {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -74,14 +75,50 @@ const Messages: React.FC = () => {
     }
   }, [userSearchQuery, availableUsers]);
 
+  // Real-time message handler
+  const handleRealTimeMessage = (message: any) => {
+    // Only add message if it's for the current conversation
+    if (selectedConversation && message.conversationId === selectedConversation.conversationId) {
+      setMessages((prev) => {
+        // Check if message already exists
+        if (prev.some((m) => m.messageId === message.messageId)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
+    }
+  };
+
+  // Real-time conversation update handler
+  const handleConversationUpdate = (conversation: any) => {
+    setConversations((prev) => {
+      const index = prev.findIndex((c) => c.conversationId === conversation.conversationId);
+      if (index >= 0) {
+        // Update existing conversation
+        const updated = [...prev];
+        updated[index] = { ...updated[index], ...conversation };
+        // Sort by lastMessageAt
+        return updated.sort((a, b) => 
+          new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+        );
+      } else {
+        // Add new conversation
+        return [conversation, ...prev].sort((a, b) => 
+          new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+        );
+      }
+    });
+  };
+
+  // Setup WebSocket for real-time messages
+  useWebSocket({
+    onMessage: handleRealTimeMessage,
+    onConversationUpdate: handleConversationUpdate,
+  });
+
   useEffect(() => {
     if (selectedConversation && selectedConversation.conversationId !== 0) {
       loadMessages(selectedConversation.conversationId);
-      // Poll for new messages every 3 seconds
-      const interval = setInterval(() => {
-        loadMessages(selectedConversation.conversationId);
-      }, 3000);
-      return () => clearInterval(interval);
     } else if (selectedConversation && selectedConversation.conversationId === 0) {
       // Temporary conversation - clear messages
       setMessages([]);
