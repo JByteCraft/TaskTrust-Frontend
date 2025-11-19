@@ -1564,10 +1564,38 @@ const JobDetails = () => {
                     </div>
                   )}
 
+                  {(() => {
+                    if (!currentApplication?.status) return null;
+                    const statusLower = currentApplication.status.toLowerCase();
+                    let employmentLabel = "";
+                    let employmentClasses =
+                      "ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ";
+
+                    if (statusLower === "accepted") {
+                      employmentLabel = "Hired";
+                      employmentClasses += "bg-green-100 text-green-800";
+                    } else if (statusLower === "rejected") {
+                      employmentLabel = "Fired";
+                      employmentClasses += "bg-red-100 text-red-800";
+                    } else if (statusLower === "withdrawn") {
+                      employmentLabel = "Resigned";
+                      employmentClasses += "bg-yellow-100 text-yellow-800";
+                    }
+
+                    if (!employmentLabel) return null;
+
+                    return (
+                      <div>
+                        <span className="text-gray-600">Employment Status:</span>
+                        <span className={employmentClasses}>{employmentLabel}</span>
+                      </div>
+                    );
+                  })()}
+
                   {currentApplication?.status &&
                     currentApplication.status.toLowerCase() === "accepted" && (
                       <div>
-                        <span className="text-gray-600">Job / Task Status:</span>
+                        <span className="text-gray-600">Task Status:</span>
                         <span className="ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800">
                           {job?.status ? job.status.replace("_", " ").toUpperCase() : "N/A"}
                         </span>
