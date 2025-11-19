@@ -23,13 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-<<<<<<< HEAD
-.env
-=======
 # dotenv environment variable files
 .env
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
->>>>>>> c37320aadc2550255cb5e7bee293287b195183f1
