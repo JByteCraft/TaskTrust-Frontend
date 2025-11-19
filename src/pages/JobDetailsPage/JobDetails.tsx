@@ -1,9 +1,31 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { FiMapPin, FiClock, FiUser, FiCheckCircle, FiX, FiEye, FiStar } from "react-icons/fi";
-import { getJob, getJobMatches, getMatchPercentage, updateJob } from "../../lib/api/jobs.api";
-import { createApplication, getJobApplications, getApplications, updateApplication } from "../../lib/api/applications.api";
-import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
+import {
+  FiMapPin,
+  FiClock,
+  FiUser,
+  FiCheckCircle,
+  FiX,
+  FiEye,
+  FiStar,
+} from "react-icons/fi";
+import { FaStar } from "react-icons/fa";
+import {
+  getJob,
+  getJobMatches,
+  getMatchPercentage,
+  updateJob,
+} from "../../lib/api/jobs.api";
+import {
+  createApplication,
+  getJobApplications,
+  getApplications,
+  updateApplication,
+} from "../../lib/api/applications.api";
+import {
+  getStoredAuthToken,
+  getAuthenticatedUserFromToken,
+} from "../../lib/utils/auth.utils";
 import { GET } from "../../lib/utils/fetch.utils";
 import { getJobReviews, createReview } from "../../lib/api/reviews.api";
 import CreateReviewModal from "../ProfilePage/components/CreateReviewModal";
@@ -48,11 +70,15 @@ const JobDetails = () => {
   const [cancelling, setCancelling] = useState(false);
   const [cooldownTime, setCooldownTime] = useState<number | null>(null);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
-  const [applicationsWithTaskers, setApplicationsWithTaskers] = useState<any[]>([]);
+  const [applicationsWithTaskers, setApplicationsWithTaskers] = useState<any[]>(
+    []
+  );
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [viewingApplication, setViewingApplication] = useState<any>(null);
   const [viewingTasker, setViewingTasker] = useState<any>(null);
-  const [viewingMatchPercentage, setViewingMatchPercentage] = useState<number | null>(null);
+  const [viewingMatchPercentage, setViewingMatchPercentage] = useState<
+    number | null
+  >(null);
   const [processingApplication, setProcessingApplication] = useState(false);
   const [showStartTaskModal, setShowStartTaskModal] = useState(false);
   const [startingTask, setStartingTask] = useState(false);
@@ -60,7 +86,9 @@ const JobDetails = () => {
   const [activeTaskers, setActiveTaskers] = useState<any[]>([]);
   const [firedTaskers, setFiredTaskers] = useState<any[]>([]);
   const [resignedTaskers, setResignedTaskers] = useState<any[]>([]);
-  const [taskersTab, setTaskersTab] = useState<"active" | "fired" | "resigned">("active");
+  const [taskersTab, setTaskersTab] = useState<"active" | "fired" | "resigned">(
+    "active"
+  );
   const [loadingTaskers, setLoadingTaskers] = useState(false);
   const [finishingTask, setFinishingTask] = useState(false);
   const [cancellingTask, setCancellingTask] = useState(false);
@@ -68,13 +96,18 @@ const JobDetails = () => {
   const [resignReason, setResignReason] = useState("");
   const [resigning, setResigning] = useState(false);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
-  const [terminatingApplication, setTerminatingApplication] = useState<any>(null);
+  const [terminatingApplication, setTerminatingApplication] =
+    useState<any>(null);
   const [terminateReason, setTerminateReason] = useState("");
   const [terminating, setTerminating] = useState(false);
-  const [showTerminationDetailsModal, setShowTerminationDetailsModal] = useState(false);
-  const [viewingTerminationDetails, setViewingTerminationDetails] = useState<any>(null);
-  const [showResignationDetailsModal, setShowResignationDetailsModal] = useState(false);
-  const [viewingResignationDetails, setViewingResignationDetails] = useState<any>(null);
+  const [showTerminationDetailsModal, setShowTerminationDetailsModal] =
+    useState(false);
+  const [viewingTerminationDetails, setViewingTerminationDetails] =
+    useState<any>(null);
+  const [showResignationDetailsModal, setShowResignationDetailsModal] =
+    useState(false);
+  const [viewingResignationDetails, setViewingResignationDetails] =
+    useState<any>(null);
   const [allRated, setAllRated] = useState(false);
   const [unratedCount, setUnratedCount] = useState(0);
   const [checkingRatings, setCheckingRatings] = useState(false);
@@ -82,13 +115,18 @@ const JobDetails = () => {
   const [taskersToRate, setTaskersToRate] = useState<any[]>([]);
   const [ratingTasker, setRatingTasker] = useState<any>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [rateTaskersTab, setRateTaskersTab] = useState<"to-rate" | "rated">("to-rate");
+  const [rateTaskersTab, setRateTaskersTab] = useState<"to-rate" | "rated">(
+    "to-rate"
+  );
   const [editingReview, setEditingReview] = useState<any>(null);
   const [showEditRatingModal, setShowEditRatingModal] = useState(false);
   const [showRateCustomerModal, setShowRateCustomerModal] = useState(false);
-  const [rateCustomerTab, setRateCustomerTab] = useState<"to-rate" | "rated">("to-rate");
+  const [rateCustomerTab, setRateCustomerTab] = useState<"to-rate" | "rated">(
+    "to-rate"
+  );
   const [showCustomerRatingModal, setShowCustomerRatingModal] = useState(false);
-  const [showEditCustomerRatingModal, setShowEditCustomerRatingModal] = useState(false);
+  const [showEditCustomerRatingModal, setShowEditCustomerRatingModal] =
+    useState(false);
   const [customerReview, setCustomerReview] = useState<any>(null);
   const [hasRatedCustomer, setHasRatedCustomer] = useState(false);
   const [checkingCustomerRating, setCheckingCustomerRating] = useState(false);
@@ -96,7 +134,10 @@ const JobDetails = () => {
   const ratingsCheckedRef = useRef(false);
   const lastJobIdRef = useRef<number | null>(null);
 
-  const user = getAuthenticatedUserFromToken<{ userId: number; role: string }>();
+  const user = getAuthenticatedUserFromToken<{
+    userId: number;
+    role: string;
+  }>();
   const isTasker = user?.role === "tasker";
   const isCustomer = user?.role === "customer" || user?.role === "admin";
   const isOwner = job && user && job.customerId === user.userId;
@@ -211,27 +252,38 @@ const JobDetails = () => {
       try {
         setLoading(true);
         const response = await getJob(Number(jobId));
-        
+
         // Extract job data from various response structures
         let jobData: any = null;
         if (response?.data) {
-          if (response.data.response && typeof response.data.response === 'object') {
+          if (
+            response.data.response &&
+            typeof response.data.response === "object"
+          ) {
             jobData = response.data.response;
-          } else if (response.data.data && typeof response.data.data === 'object') {
+          } else if (
+            response.data.data &&
+            typeof response.data.data === "object"
+          ) {
             jobData = response.data.data;
-          } else if (typeof response.data === 'object' && response.data.jobId) {
+          } else if (typeof response.data === "object" && response.data.jobId) {
             jobData = response.data;
           }
         }
-        
+
         if (jobData && jobData.jobId) {
           setJob(jobData);
-          
+
           // Fetch poster name
           if (jobData.customerId) {
             try {
-              const userResponse = await GET<any>(`/users/${jobData.customerId}/public`, "", token);
-              const userData = userResponse?.response || userResponse?.data || userResponse;
+              const userResponse = await GET<any>(
+                `/users/${jobData.customerId}/public`,
+                "",
+                token
+              );
+              const userData =
+                userResponse?.response || userResponse?.data || userResponse;
               if (userData?.firstName && userData?.lastName) {
                 setPosterName(`${userData.firstName} ${userData.lastName}`);
               }
@@ -239,7 +291,7 @@ const JobDetails = () => {
               console.error("Fetch poster name error:", err);
             }
           }
-          
+
           // If tasker, get match percentage and check if already applied
           if (isTasker && user?.userId) {
             try {
@@ -248,7 +300,10 @@ const JobDetails = () => {
                 user.userId
               );
               // Backend returns: { status: 200, response: { matchPercentage }, message: '...' }
-              const matchData = matchResponse?.data?.response || matchResponse?.data?.data || matchResponse?.data;
+              const matchData =
+                matchResponse?.data?.response ||
+                matchResponse?.data?.data ||
+                matchResponse?.data;
               setMatchPercentage(matchData?.matchPercentage || null);
             } catch (err) {
               console.error("Match calculation error:", err);
@@ -256,15 +311,21 @@ const JobDetails = () => {
 
             // Check if tasker has already applied
             try {
-              const myAppsResponse = await getApplications({ jobId: Number(jobId), taskerId: user.userId });
+              const myAppsResponse = await getApplications({
+                jobId: Number(jobId),
+                taskerId: user.userId,
+              });
               // axios returns: { data: { status, response, message } }
               let myAppsData: any[] = [];
-              if (myAppsResponse?.data?.response && Array.isArray(myAppsResponse.data.response)) {
+              if (
+                myAppsResponse?.data?.response &&
+                Array.isArray(myAppsResponse.data.response)
+              ) {
                 myAppsData = myAppsResponse.data.response;
               } else if (Array.isArray(myAppsResponse?.data)) {
                 myAppsData = myAppsResponse.data;
               }
-              
+
               if (myAppsData.length > 0) {
                 setHasApplied(true);
                 setCurrentApplication(myAppsData[0]);
@@ -272,7 +333,7 @@ const JobDetails = () => {
                 setHasApplied(false);
                 setCurrentApplication(null);
               }
-              
+
               // Check for cooldown period
               const cooldownKey = `app_cancelled_${jobId}_${user.userId}`;
               const cancelledTime = localStorage.getItem(cooldownKey);
@@ -299,7 +360,10 @@ const JobDetails = () => {
             const appsResponse = await getJobApplications(Number(jobId));
             // axios returns: { data: { status, response, message } }
             let appsData: any[] = [];
-            if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+            if (
+              appsResponse?.data?.response &&
+              Array.isArray(appsResponse.data.response)
+            ) {
               appsData = appsResponse.data.response;
             } else if (Array.isArray(appsResponse?.data)) {
               appsData = appsResponse.data;
@@ -348,7 +412,7 @@ const JobDetails = () => {
       try {
         setCheckingRatings(true);
         lastJobIdRef.current = job.jobId;
-        
+
         // Get all accepted applications (active taskers)
         const acceptedApps = applications.filter(
           (app: any) => app.status?.toLowerCase() === "accepted"
@@ -365,12 +429,16 @@ const JobDetails = () => {
         // Get all reviews for this job
         const reviewsResponse = await getJobReviews(job.jobId);
         let reviewsData: any[] = [];
-        
+
         // Extract reviews array from response
         if (reviewsResponse?.response?.reviews) {
-          reviewsData = Array.isArray(reviewsResponse.response.reviews) ? reviewsResponse.response.reviews : [];
+          reviewsData = Array.isArray(reviewsResponse.response.reviews)
+            ? reviewsResponse.response.reviews
+            : [];
         } else if (reviewsResponse?.data?.response?.reviews) {
-          reviewsData = Array.isArray(reviewsResponse.data.response.reviews) ? reviewsResponse.data.response.reviews : [];
+          reviewsData = Array.isArray(reviewsResponse.data.response.reviews)
+            ? reviewsResponse.data.response.reviews
+            : [];
         } else if (Array.isArray(reviewsResponse?.response)) {
           reviewsData = reviewsResponse.response;
         } else if (Array.isArray(reviewsResponse?.data?.response)) {
@@ -393,10 +461,14 @@ const JobDetails = () => {
         });
 
         // Get rated tasker IDs
-        const ratedTaskerIds = new Set(reviewsData.map((r: any) => r?.taskerId).filter(Boolean));
+        const ratedTaskerIds = new Set(
+          reviewsData.map((r: any) => r?.taskerId).filter(Boolean)
+        );
 
         // Calculate unrated count
-        const unratedApps = acceptedApps.filter((app: any) => !ratedTaskerIds.has(app.taskerId));
+        const unratedApps = acceptedApps.filter(
+          (app: any) => !ratedTaskerIds.has(app.taskerId)
+        );
         setUnratedCount(unratedApps.length);
         setAllRated(unratedApps.length === 0);
 
@@ -405,10 +477,17 @@ const JobDetails = () => {
           acceptedApps.map(async (app: any) => {
             try {
               const token = getStoredAuthToken();
-              const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-              const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
+              const taskerResponse = await GET(
+                `/users/${app.taskerId}/public`,
+                "",
+                token
+              );
+              const taskerData =
+                taskerResponse?.response ||
+                taskerResponse?.data ||
+                taskerResponse;
               const reviewData = reviewMap.get(app.taskerId) || null;
-              
+
               return {
                 ...app,
                 taskerInfo: taskerData || null,
@@ -452,8 +531,10 @@ const JobDetails = () => {
     try {
       setApplying(true);
       const payload: any = {};
-      if (applicationData.coverLetter) payload.coverLetter = applicationData.coverLetter;
-      if (applicationData.proposedBudget) payload.proposedBudget = Number(applicationData.proposedBudget);
+      if (applicationData.coverLetter)
+        payload.coverLetter = applicationData.coverLetter;
+      if (applicationData.proposedBudget)
+        payload.proposedBudget = Number(applicationData.proposedBudget);
 
       await createApplication({ jobId: job.jobId, ...payload });
       alert("Application submitted successfully!");
@@ -485,7 +566,10 @@ const JobDetails = () => {
       try {
         const appsResponse = await getJobApplications(Number(jobId));
         let appsData: any[] = [];
-        if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+        if (
+          appsResponse?.data?.response &&
+          Array.isArray(appsResponse.data.response)
+        ) {
           appsData = appsResponse.data.response;
         } else if (Array.isArray(appsResponse?.data)) {
           appsData = appsResponse.data;
@@ -493,7 +577,9 @@ const JobDetails = () => {
 
         // Enrich matches with application data
         matchesData = matchesData.map((match: any) => {
-          const application = appsData.find((app: any) => app.taskerId === match.tasker?.userId);
+          const application = appsData.find(
+            (app: any) => app.taskerId === match.tasker?.userId
+          );
           return {
             ...match,
             application: application || null,
@@ -517,11 +603,14 @@ const JobDetails = () => {
     if (!jobId) return;
     setLoadingApplications(true);
     setShowApplicationsModal(true);
-    
+
     try {
       const appsResponse = await getJobApplications(Number(jobId));
       let appsData: any[] = [];
-      if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+      if (
+        appsResponse?.data?.response &&
+        Array.isArray(appsResponse.data.response)
+      ) {
         appsData = appsResponse.data.response;
       } else if (Array.isArray(appsResponse?.data)) {
         appsData = appsResponse.data;
@@ -533,9 +622,14 @@ const JobDetails = () => {
           try {
             const token = getStoredAuthToken();
             if (!token) return { ...app, taskerInfo: null };
-            
-            const userResponse = await GET<any>(`/users/${app.taskerId}/public`, "", token);
-            const userData = userResponse?.response || userResponse?.data || userResponse;
+
+            const userResponse = await GET<any>(
+              `/users/${app.taskerId}/public`,
+              "",
+              token
+            );
+            const userData =
+              userResponse?.response || userResponse?.data || userResponse;
             return {
               ...app,
               taskerInfo: userData || null,
@@ -560,12 +654,18 @@ const JobDetails = () => {
     setViewingApplication(application);
     setViewingTasker(application.taskerInfo);
     setViewingMatchPercentage(null);
-    
+
     // Fetch match percentage for this tasker and job
     if (application.taskerId && jobId) {
       try {
-        const matchResponse = await getMatchPercentage(Number(jobId), application.taskerId);
-        const matchData = matchResponse?.data?.response || matchResponse?.data?.data || matchResponse?.data;
+        const matchResponse = await getMatchPercentage(
+          Number(jobId),
+          application.taskerId
+        );
+        const matchData =
+          matchResponse?.data?.response ||
+          matchResponse?.data?.data ||
+          matchResponse?.data;
         if (matchData?.matchPercentage !== undefined) {
           setViewingMatchPercentage(matchData.matchPercentage);
         }
@@ -590,7 +690,7 @@ const JobDetails = () => {
 
     try {
       setProcessingApplication(true);
-      await updateApplication(applicationId, { status: 'accepted' });
+      await updateApplication(applicationId, { status: "accepted" });
       alert("Application accepted successfully!");
 
       // Refresh applications list
@@ -598,7 +698,10 @@ const JobDetails = () => {
         try {
           const appsResponse = await getJobApplications(Number(jobId));
           let appsData: any[] = [];
-          if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+          if (
+            appsResponse?.data?.response &&
+            Array.isArray(appsResponse.data.response)
+          ) {
             appsData = appsResponse.data.response;
           } else if (Array.isArray(appsResponse?.data)) {
             appsData = appsResponse.data;
@@ -611,9 +714,14 @@ const JobDetails = () => {
               try {
                 const token = getStoredAuthToken();
                 if (!token) return { ...app, taskerInfo: null };
-                
-                const userResponse = await GET<any>(`/users/${app.taskerId}/public`, "", token);
-                const userData = userResponse?.response || userResponse?.data || userResponse;
+
+                const userResponse = await GET<any>(
+                  `/users/${app.taskerId}/public`,
+                  "",
+                  token
+                );
+                const userData =
+                  userResponse?.response || userResponse?.data || userResponse;
                 return {
                   ...app,
                   taskerInfo: userData || null,
@@ -627,8 +735,13 @@ const JobDetails = () => {
           setApplicationsWithTaskers(appsWithTaskers);
 
           // Update viewing application if it's the same one
-          if (viewingApplication && viewingApplication.applicationId === applicationId) {
-            const updatedApp = appsWithTaskers.find((a: any) => a.applicationId === applicationId);
+          if (
+            viewingApplication &&
+            viewingApplication.applicationId === applicationId
+          ) {
+            const updatedApp = appsWithTaskers.find(
+              (a: any) => a.applicationId === applicationId
+            );
             if (updatedApp) {
               setViewingApplication(updatedApp);
             }
@@ -660,7 +773,7 @@ const JobDetails = () => {
 
     try {
       setProcessingApplication(true);
-      await updateApplication(applicationId, { status: 'rejected' });
+      await updateApplication(applicationId, { status: "rejected" });
       alert("Application rejected.");
 
       // Refresh applications list
@@ -668,7 +781,10 @@ const JobDetails = () => {
         try {
           const appsResponse = await getJobApplications(Number(jobId));
           let appsData: any[] = [];
-          if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+          if (
+            appsResponse?.data?.response &&
+            Array.isArray(appsResponse.data.response)
+          ) {
             appsData = appsResponse.data.response;
           } else if (Array.isArray(appsResponse?.data)) {
             appsData = appsResponse.data;
@@ -681,9 +797,14 @@ const JobDetails = () => {
               try {
                 const token = getStoredAuthToken();
                 if (!token) return { ...app, taskerInfo: null };
-                
-                const userResponse = await GET<any>(`/users/${app.taskerId}/public`, "", token);
-                const userData = userResponse?.response || userResponse?.data || userResponse;
+
+                const userResponse = await GET<any>(
+                  `/users/${app.taskerId}/public`,
+                  "",
+                  token
+                );
+                const userData =
+                  userResponse?.response || userResponse?.data || userResponse;
                 return {
                   ...app,
                   taskerInfo: userData || null,
@@ -697,8 +818,13 @@ const JobDetails = () => {
           setApplicationsWithTaskers(appsWithTaskers);
 
           // Update viewing application if it's the same one
-          if (viewingApplication && viewingApplication.applicationId === applicationId) {
-            const updatedApp = appsWithTaskers.find((a: any) => a.applicationId === applicationId);
+          if (
+            viewingApplication &&
+            viewingApplication.applicationId === applicationId
+          ) {
+            const updatedApp = appsWithTaskers.find(
+              (a: any) => a.applicationId === applicationId
+            );
             if (updatedApp) {
               setViewingApplication(updatedApp);
             }
@@ -716,8 +842,12 @@ const JobDetails = () => {
   };
 
   // Calculate hired and rejected counts
-  const hiredCount = applications.filter((app: any) => app.status?.toLowerCase() === "accepted").length;
-  const rejectedCount = applications.filter((app: any) => app.status?.toLowerCase() === "rejected").length;
+  const hiredCount = applications.filter(
+    (app: any) => app.status?.toLowerCase() === "accepted"
+  ).length;
+  const rejectedCount = applications.filter(
+    (app: any) => app.status?.toLowerCase() === "rejected"
+  ).length;
 
   const handleStartTask = async () => {
     if (!job || !user || !isOwner) return;
@@ -738,11 +868,17 @@ const JobDetails = () => {
         const response = await getJob(Number(jobId));
         let jobData: any = null;
         if (response?.data) {
-          if (response.data.response && typeof response.data.response === 'object') {
+          if (
+            response.data.response &&
+            typeof response.data.response === "object"
+          ) {
             jobData = response.data.response;
-          } else if (response.data.data && typeof response.data.data === 'object') {
+          } else if (
+            response.data.data &&
+            typeof response.data.data === "object"
+          ) {
             jobData = response.data.data;
-          } else if (typeof response.data === 'object' && response.data.jobId) {
+          } else if (typeof response.data === "object" && response.data.jobId) {
             jobData = response.data;
           }
         }
@@ -778,25 +914,37 @@ const JobDetails = () => {
       // Get all applications for this job
       const appsResponse = await getJobApplications(Number(jobId));
       console.log("Apps Response:", appsResponse);
-      
+
       let appsData: any[] = [];
-      if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+      if (
+        appsResponse?.data?.response &&
+        Array.isArray(appsResponse.data.response)
+      ) {
         appsData = appsResponse.data.response;
-      } else if (appsResponse?.data?.data && Array.isArray(appsResponse.data.data)) {
+      } else if (
+        appsResponse?.data?.data &&
+        Array.isArray(appsResponse.data.data)
+      ) {
         appsData = appsResponse.data.data;
       } else if (Array.isArray(appsResponse?.data)) {
         appsData = appsResponse.data;
       } else if (Array.isArray(appsResponse?.response)) {
         appsData = appsResponse.response;
       }
-      
+
       console.log("Apps Data:", appsData);
 
       // Separate active (accepted), fired (rejected), and resigned (withdrawn) taskers
-      const acceptedApps = appsData.filter((app: any) => app.status?.toLowerCase() === "accepted");
-      const rejectedApps = appsData.filter((app: any) => app.status?.toLowerCase() === "rejected");
-      const withdrawnApps = appsData.filter((app: any) => app.status?.toLowerCase() === "withdrawn");
-      
+      const acceptedApps = appsData.filter(
+        (app: any) => app.status?.toLowerCase() === "accepted"
+      );
+      const rejectedApps = appsData.filter(
+        (app: any) => app.status?.toLowerCase() === "rejected"
+      );
+      const withdrawnApps = appsData.filter(
+        (app: any) => app.status?.toLowerCase() === "withdrawn"
+      );
+
       console.log("Accepted Apps:", acceptedApps);
       console.log("Rejected Apps:", rejectedApps);
       console.log("Withdrawn Apps:", withdrawnApps);
@@ -805,10 +953,15 @@ const JobDetails = () => {
       const activeTaskersList: any[] = [];
       for (const app of acceptedApps) {
         try {
-          const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
+          const taskerResponse = await GET(
+            `/users/${app.taskerId}/public`,
+            "",
+            token
+          );
           console.log(`Tasker ${app.taskerId} response:`, taskerResponse);
-          const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
-          
+          const taskerData =
+            taskerResponse?.response || taskerResponse?.data || taskerResponse;
+
           activeTaskersList.push({
             ...app,
             taskerInfo: taskerData || null,
@@ -827,9 +980,14 @@ const JobDetails = () => {
       const firedTaskersList: any[] = [];
       for (const app of rejectedApps) {
         try {
-          const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-          const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
-          
+          const taskerResponse = await GET(
+            `/users/${app.taskerId}/public`,
+            "",
+            token
+          );
+          const taskerData =
+            taskerResponse?.response || taskerResponse?.data || taskerResponse;
+
           firedTaskersList.push({
             ...app,
             taskerInfo: taskerData || null,
@@ -848,9 +1006,14 @@ const JobDetails = () => {
       const resignedTaskersList: any[] = [];
       for (const app of withdrawnApps) {
         try {
-          const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-          const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
-          
+          const taskerResponse = await GET(
+            `/users/${app.taskerId}/public`,
+            "",
+            token
+          );
+          const taskerData =
+            taskerResponse?.response || taskerResponse?.data || taskerResponse;
+
           resignedTaskersList.push({
             ...app,
             taskerInfo: taskerData || null,
@@ -894,9 +1057,9 @@ const JobDetails = () => {
 
     try {
       setTerminating(true);
-      await updateApplication(terminatingApplication.applicationId, { 
-        status: 'rejected',
-        coverLetter: terminateReason // Store termination reason in coverLetter field
+      await updateApplication(terminatingApplication.applicationId, {
+        status: "rejected",
+        coverLetter: terminateReason, // Store termination reason in coverLetter field
       });
       alert("Tasker terminated successfully.");
 
@@ -939,7 +1102,8 @@ const JobDetails = () => {
 
     // Find the tasker's application for this job
     const taskerApplication = applications.find(
-      (app: any) => app.taskerId === user.userId && app.status?.toLowerCase() === "accepted"
+      (app: any) =>
+        app.taskerId === user.userId && app.status?.toLowerCase() === "accepted"
     );
 
     if (!taskerApplication) {
@@ -949,9 +1113,9 @@ const JobDetails = () => {
 
     try {
       setResigning(true);
-      await updateApplication(taskerApplication.applicationId, { 
-        status: 'withdrawn',
-        coverLetter: resignReason // Using coverLetter field to store resignation reason
+      await updateApplication(taskerApplication.applicationId, {
+        status: "withdrawn",
+        coverLetter: resignReason, // Using coverLetter field to store resignation reason
       });
       alert("You have successfully resigned from this job.");
 
@@ -960,11 +1124,17 @@ const JobDetails = () => {
         const response = await getJob(Number(jobId));
         let jobData: any = null;
         if (response?.data) {
-          if (response.data.response && typeof response.data.response === 'object') {
+          if (
+            response.data.response &&
+            typeof response.data.response === "object"
+          ) {
             jobData = response.data.response;
-          } else if (response.data.data && typeof response.data.data === 'object') {
+          } else if (
+            response.data.data &&
+            typeof response.data.data === "object"
+          ) {
             jobData = response.data.data;
-          } else if (typeof response.data === 'object' && response.data.jobId) {
+          } else if (typeof response.data === "object" && response.data.jobId) {
             jobData = response.data;
           }
         }
@@ -975,7 +1145,10 @@ const JobDetails = () => {
         // Refresh applications
         const appsResponse = await getJobApplications(Number(jobId));
         let appsData: any[] = [];
-        if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+        if (
+          appsResponse?.data?.response &&
+          Array.isArray(appsResponse.data.response)
+        ) {
           appsData = appsResponse.data.response;
         } else if (Array.isArray(appsResponse?.data)) {
           appsData = appsResponse.data;
@@ -1004,7 +1177,11 @@ const JobDetails = () => {
       return;
     }
 
-    if (!window.confirm("Are you sure you want to finish this task? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to finish this task? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
@@ -1018,11 +1195,17 @@ const JobDetails = () => {
         const response = await getJob(Number(jobId));
         let jobData: any = null;
         if (response?.data) {
-          if (response.data.response && typeof response.data.response === 'object') {
+          if (
+            response.data.response &&
+            typeof response.data.response === "object"
+          ) {
             jobData = response.data.response;
-          } else if (response.data.data && typeof response.data.data === 'object') {
+          } else if (
+            response.data.data &&
+            typeof response.data.data === "object"
+          ) {
             jobData = response.data.data;
-          } else if (typeof response.data === 'object' && response.data.jobId) {
+          } else if (typeof response.data === "object" && response.data.jobId) {
             jobData = response.data;
           }
         }
@@ -1049,7 +1232,11 @@ const JobDetails = () => {
       return;
     }
 
-    if (!window.confirm("Are you sure you want to cancel this task? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to cancel this task? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
@@ -1063,11 +1250,17 @@ const JobDetails = () => {
         const response = await getJob(Number(jobId));
         let jobData: any = null;
         if (response?.data) {
-          if (response.data.response && typeof response.data.response === 'object') {
+          if (
+            response.data.response &&
+            typeof response.data.response === "object"
+          ) {
             jobData = response.data.response;
-          } else if (response.data.data && typeof response.data.data === 'object') {
+          } else if (
+            response.data.data &&
+            typeof response.data.data === "object"
+          ) {
             jobData = response.data.data;
-          } else if (typeof response.data === 'object' && response.data.jobId) {
+          } else if (typeof response.data === "object" && response.data.jobId) {
             jobData = response.data;
           }
         }
@@ -1097,31 +1290,41 @@ const JobDetails = () => {
     try {
       // If applicationId is provided, use it directly
       let appId = applicationId;
-      
+
       // If not provided, find the application
       if (!appId) {
-        const appsResponse = await getApplications({ jobId: job.jobId, taskerId });
+        const appsResponse = await getApplications({
+          jobId: job.jobId,
+          taskerId,
+        });
         let appsData: any[] = [];
-        
-        if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+
+        if (
+          appsResponse?.data?.response &&
+          Array.isArray(appsResponse.data.response)
+        ) {
           appsData = appsResponse.data.response;
         } else if (Array.isArray(appsResponse?.data)) {
           appsData = appsResponse.data;
         }
-        
-        const existingApp = appsData.find((app: any) => app.taskerId === taskerId);
+
+        const existingApp = appsData.find(
+          (app: any) => app.taskerId === taskerId
+        );
         if (existingApp) {
           appId = existingApp.applicationId;
         }
       }
 
       if (!appId) {
-        alert("This tasker has not applied to this job yet. They need to apply first.");
+        alert(
+          "This tasker has not applied to this job yet. They need to apply first."
+        );
         return;
       }
 
       // Accept the application
-      await updateApplication(appId, { status: 'accepted' });
+      await updateApplication(appId, { status: "accepted" });
       alert("Tasker hired successfully!");
 
       // Refresh applications list
@@ -1129,7 +1332,10 @@ const JobDetails = () => {
         try {
           const appsResponse = await getJobApplications(Number(jobId));
           let appsData: any[] = [];
-          if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
+          if (
+            appsResponse?.data?.response &&
+            Array.isArray(appsResponse.data.response)
+          ) {
             appsData = appsResponse.data.response;
           } else if (Array.isArray(appsResponse?.data)) {
             appsData = appsResponse.data;
@@ -1160,7 +1366,9 @@ const JobDetails = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Not Found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Job Not Found
+          </h2>
           <Link to="/jobs" className="text-blue-700 hover:underline">
             Back to Jobs
           </Link>
@@ -1176,15 +1384,23 @@ const JobDetails = () => {
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
             <div className="flex-1 w-full">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+                {job.title}
+              </h1>
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-gray-600">
-                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
-                  job.status === "open" ? "bg-green-200 text-green-800" :
-                  job.status === "in_progress" ? "bg-blue-200 text-blue-800" :
-                  job.status === "finished" ? "bg-purple-200 text-purple-800" :
-                  job.status === "completed" ? "bg-gray-100 text-gray-800" :
-                  "bg-red-200 text-red-800"
-                }`}>
+                <span
+                  className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
+                    job.status === "open"
+                      ? "bg-green-200 text-green-800"
+                      : job.status === "in_progress"
+                      ? "bg-blue-200 text-blue-800"
+                      : job.status === "finished"
+                      ? "bg-purple-200 text-purple-800"
+                      : job.status === "completed"
+                      ? "bg-gray-100 text-gray-800"
+                      : "bg-red-200 text-red-800"
+                  }`}
+                >
                   {job.status.replace("_", " ").toUpperCase()}
                 </span>
                 {matchPercentage !== null && (
@@ -1207,12 +1423,18 @@ const JobDetails = () => {
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-4">
             <div className="flex items-center gap-2 text-gray-600">
               <span className="text-lg font-semibold text-gray-700">₱</span>
-              <span className="font-semibold text-gray-900">{job.budget.toLocaleString()}</span>
+              <span className="font-semibold text-gray-900">
+                {job.budget.toLocaleString()}
+              </span>
             </div>
             {(job.city || job.province) && (
               <div className="flex items-center gap-2 text-gray-600">
                 <FiMapPin />
-                <span>{job.city && job.province ? `${job.city}, ${job.province}` : job.city || job.province}</span>
+                <span>
+                  {job.city && job.province
+                    ? `${job.city}, ${job.province}`
+                    : job.city || job.province}
+                </span>
               </div>
             )}
             {job.estimatedHours && (
@@ -1228,14 +1450,16 @@ const JobDetails = () => {
               </div>
             )}
           </div>
-          
+
           {posterName && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex items-center gap-2 text-gray-600">
                 <FiUser className="w-4 h-4" />
                 <span className="text-sm">
                   <span className="text-gray-500">Posted by:</span>{" "}
-                  <span className="font-semibold text-gray-900">{posterName}</span>
+                  <span className="font-semibold text-gray-900">
+                    {posterName}
+                  </span>
                 </span>
               </div>
             </div>
@@ -1247,14 +1471,20 @@ const JobDetails = () => {
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Description */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Description</h2>
-              <p className="text-gray-700 whitespace-pre-wrap">{job.description}</p>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                Description
+              </h2>
+              <p className="text-gray-700 whitespace-pre-wrap">
+                {job.description}
+              </p>
             </div>
 
             {/* Required Expertise */}
             {job.requiredExpertise && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Required Expertise</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Required Expertise
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
                     {job.requiredExpertise}
@@ -1266,7 +1496,9 @@ const JobDetails = () => {
             {/* Required Skills */}
             {job.requiredSkills && job.requiredSkills.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Required Skills</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Required Skills
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {job.requiredSkills.map((skill, idx) => (
                     <span
@@ -1298,19 +1530,29 @@ const JobDetails = () => {
                             Application #{app.applicationId}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Status: <span className={`font-medium ${
-                              app.status === "accepted" ? "text-green-700" :
-                              app.status === "rejected" ? "text-red-700" :
-                              "text-yellow-700"
-                            }`}>
-                              {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                            Status:{" "}
+                            <span
+                              className={`font-medium ${
+                                app.status === "accepted"
+                                  ? "text-green-700"
+                                  : app.status === "rejected"
+                                  ? "text-red-700"
+                                  : "text-yellow-700"
+                              }`}
+                            >
+                              {app.status.charAt(0).toUpperCase() +
+                                app.status.slice(1)}
                             </span>
                           </p>
                         </div>
                         {app.proposedBudget && (
                           <div className="text-right">
-                            <p className="text-sm text-gray-600">Proposed Budget</p>
-                            <p className="font-semibold text-gray-900">₱{app.proposedBudget.toLocaleString()}</p>
+                            <p className="text-sm text-gray-600">
+                              Proposed Budget
+                            </p>
+                            <p className="font-semibold text-gray-900">
+                              ₱{app.proposedBudget.toLocaleString()}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1336,30 +1578,49 @@ const JobDetails = () => {
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
                 {hasApplied && currentApplication?.status !== "withdrawn" ? (
                   <div className="text-center py-4 space-y-3">
-                    <p className="text-gray-700 font-medium mb-2">You have already applied to this job</p>
-                    <p className="text-sm text-gray-500">Check your applications page to see the status</p>
+                    <p className="text-gray-700 font-medium mb-2">
+                      You have already applied to this job
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Check your applications page to see the status
+                    </p>
                     {currentApplication?.status === "pending" && (
                       <button
                         onClick={async () => {
-                          if (!confirm("Are you sure you want to cancel this application? You will need to wait 1 hour before applying again.")) {
+                          if (
+                            !confirm(
+                              "Are you sure you want to cancel this application? You will need to wait 1 hour before applying again."
+                            )
+                          ) {
                             return;
                           }
-                          
+
                           try {
                             setCancelling(true);
-                            await updateApplication(currentApplication.applicationId, { status: "withdrawn" });
-                            
+                            await updateApplication(
+                              currentApplication.applicationId,
+                              { status: "withdrawn" }
+                            );
+
                             // Store cancellation time in localStorage
                             const cooldownKey = `app_cancelled_${jobId}_${user?.userId}`;
-                            localStorage.setItem(cooldownKey, Date.now().toString());
-                            
+                            localStorage.setItem(
+                              cooldownKey,
+                              Date.now().toString()
+                            );
+
                             setHasApplied(false);
                             setCurrentApplication(null);
                             setCooldownTime(60 * 60 * 1000); // 1 hour
-                            alert("Application cancelled successfully. You can re-apply after 1 hour.");
+                            alert(
+                              "Application cancelled successfully. You can re-apply after 1 hour."
+                            );
                           } catch (error: any) {
                             console.error("Cancel application error:", error);
-                            alert(error.response?.data?.message || "Failed to cancel application");
+                            alert(
+                              error.response?.data?.message ||
+                                "Failed to cancel application"
+                            );
                           } finally {
                             setCancelling(false);
                           }
@@ -1373,18 +1634,23 @@ const JobDetails = () => {
                   </div>
                 ) : cooldownTime && cooldownTime > 0 ? (
                   <div className="text-center py-4">
-                    <p className="text-gray-700 font-medium mb-2">Application Cancelled</p>
+                    <p className="text-gray-700 font-medium mb-2">
+                      Application Cancelled
+                    </p>
                     <p className="text-sm text-gray-500 mb-3">
-                      You can re-apply in {Math.ceil(cooldownTime / (60 * 1000))} minutes
+                      You can re-apply in{" "}
+                      {Math.ceil(cooldownTime / (60 * 1000))} minutes
                     </p>
                     <button
                       onClick={() => {
                         // Update cooldown display every second
                         const interval = setInterval(() => {
                           const cooldownKey = `app_cancelled_${jobId}_${user?.userId}`;
-                          const cancelledTime = localStorage.getItem(cooldownKey);
+                          const cancelledTime =
+                            localStorage.getItem(cooldownKey);
                           if (cancelledTime) {
-                            const timeDiff = Date.now() - parseInt(cancelledTime);
+                            const timeDiff =
+                              Date.now() - parseInt(cancelledTime);
                             const oneHour = 60 * 60 * 1000;
                             if (timeDiff < oneHour) {
                               setCooldownTime(oneHour - timeDiff);
@@ -1415,7 +1681,9 @@ const JobDetails = () => {
                   </button>
                 ) : (
                   <div className="space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Submit Application</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                      Submit Application
+                    </h3>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Cover Letter (Optional)
@@ -1424,7 +1692,10 @@ const JobDetails = () => {
                         rows={4}
                         value={applicationData.coverLetter}
                         onChange={(e) =>
-                          setApplicationData({ ...applicationData, coverLetter: e.target.value })
+                          setApplicationData({
+                            ...applicationData,
+                            coverLetter: e.target.value,
+                          })
                         }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="Tell the customer why you're perfect for this job..."
@@ -1438,7 +1709,10 @@ const JobDetails = () => {
                         type="number"
                         value={applicationData.proposedBudget}
                         onChange={(e) =>
-                          setApplicationData({ ...applicationData, proposedBudget: e.target.value })
+                          setApplicationData({
+                            ...applicationData,
+                            proposedBudget: e.target.value,
+                          })
                         }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="Leave empty to use job budget"
@@ -1455,7 +1729,10 @@ const JobDetails = () => {
                       <button
                         onClick={() => {
                           setShowApplicationForm(false);
-                          setApplicationData({ coverLetter: "", proposedBudget: "" });
+                          setApplicationData({
+                            coverLetter: "",
+                            proposedBudget: "",
+                          });
                         }}
                         className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base"
                       >
@@ -1472,48 +1749,64 @@ const JobDetails = () => {
           <div className="space-y-4 sm:space-y-6">
             {/* Job Info Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Job Details</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
+                Job Details
+              </h3>
               <div className="space-y-3 text-sm">
                 <div>
                   <span className="text-gray-600">Status:</span>
-                  <span className="ml-2 font-medium capitalize">{job.status.replace("_", " ")}</span>
+                  <span className="ml-2 font-medium capitalize">
+                    {job.status.replace("_", " ")}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Applications:</span>
-                  <span className="ml-2 font-medium">{job.applicationsCount}</span>
+                  <span className="ml-2 font-medium">
+                    {job.applicationsCount}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Hired:</span>
-                  <span className="ml-2 font-medium text-green-700">{hiredCount}</span>
+                  <span className="ml-2 font-medium text-green-700">
+                    {hiredCount}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Rejected:</span>
-                  <span className="ml-2 font-medium text-red-700">{rejectedCount}</span>
+                  <span className="ml-2 font-medium text-red-700">
+                    {rejectedCount}
+                  </span>
                 </div>
                 {job.status === "finished" && (
                   <div>
                     {isOwner ? (
                       checkingRatings ? (
-                        <span className="text-gray-500 text-sm">Checking ratings...</span>
+                        <span className="text-gray-500 text-sm">
+                          Checking ratings...
+                        </span>
                       ) : allRated ? (
                         <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
                           Customer Rated
                         </span>
                       ) : (
                         <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">
-                          {unratedCount} Customer{unratedCount !== 1 ? "s" : ""} to Rate
+                          {unratedCount} Customer{unratedCount !== 1 ? "s" : ""}{" "}
+                          to Rate
                         </span>
                       )
                     ) : canRateCustomer ? (
                       checkingCustomerRating ? (
-                        <span className="text-gray-500 text-sm">Checking ratings...</span>
+                        <span className="text-gray-500 text-sm">
+                          Checking ratings...
+                        </span>
                       ) : hasRatedCustomer ? (
                         <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
                           Customer Rated
                         </span>
                       ) : (
                         <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">
-                          {customersToRateCount} Customer{customersToRateCount !== 1 ? "s" : ""} to Rate
+                          {customersToRateCount} Customer
+                          {customersToRateCount !== 1 ? "s" : ""} to Rate
                         </span>
                       )
                     ) : null}
@@ -1546,25 +1839,34 @@ const JobDetails = () => {
                   {hasApplied &&
                     currentApplication &&
                     job?.status?.toLowerCase() === "open" && (
-                    <div>
-                      <span className="text-gray-600">Application Status:</span>
-                      <span
-                        className={`ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                          (currentApplication.status || "").toLowerCase() === "accepted"
-                            ? "bg-green-100 text-green-800"
-                            : (currentApplication.status || "").toLowerCase() === "pending"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : (currentApplication.status || "").toLowerCase() === "rejected"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {currentApplication.status
-                          ? currentApplication.status.replace("_", " ").toUpperCase()
-                          : "N/A"}
-                      </span>
-                    </div>
-                  )}
+                      <div>
+                        <span className="text-gray-600">
+                          Application Status:
+                        </span>
+                        <span
+                          className={`ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                            (currentApplication.status || "").toLowerCase() ===
+                            "accepted"
+                              ? "bg-green-100 text-green-800"
+                              : (
+                                  currentApplication.status || ""
+                                ).toLowerCase() === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : (
+                                  currentApplication.status || ""
+                                ).toLowerCase() === "rejected"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {currentApplication.status
+                            ? currentApplication.status
+                                .replace("_", " ")
+                                .toUpperCase()
+                            : "N/A"}
+                        </span>
+                      </div>
+                    )}
 
                   {(() => {
                     if (!currentApplication?.status) return null;
@@ -1588,8 +1890,12 @@ const JobDetails = () => {
 
                     return (
                       <div>
-                        <span className="text-gray-600">Employment Status:</span>
-                        <span className={employmentClasses}>{employmentLabel}</span>
+                        <span className="text-gray-600">
+                          Employment Status:
+                        </span>
+                        <span className={employmentClasses}>
+                          {employmentLabel}
+                        </span>
                       </div>
                     );
                   })()}
@@ -1615,7 +1921,9 @@ const JobDetails = () => {
             {/* Actions (Owner) */}
             {isOwner && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Actions</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Actions
+                </h3>
                 {job.status === "in_progress" ? (
                   <>
                     <button
@@ -1650,20 +1958,37 @@ const JobDetails = () => {
                         try {
                           setCheckingRatings(true);
                           const acceptedApps = applications.filter(
-                            (app: any) => app.status?.toLowerCase() === "accepted"
+                            (app: any) =>
+                              app.status?.toLowerCase() === "accepted"
                           );
 
                           if (acceptedApps.length > 0) {
-                            const reviewsResponse = await getJobReviews(job.jobId);
+                            const reviewsResponse = await getJobReviews(
+                              job.jobId
+                            );
                             let reviewsData: any[] = [];
-                            
+
                             if (reviewsResponse?.response?.reviews) {
-                              reviewsData = Array.isArray(reviewsResponse.response.reviews) ? reviewsResponse.response.reviews : [];
-                            } else if (reviewsResponse?.data?.response?.reviews) {
-                              reviewsData = Array.isArray(reviewsResponse.data.response.reviews) ? reviewsResponse.data.response.reviews : [];
-                            } else if (Array.isArray(reviewsResponse?.response)) {
+                              reviewsData = Array.isArray(
+                                reviewsResponse.response.reviews
+                              )
+                                ? reviewsResponse.response.reviews
+                                : [];
+                            } else if (
+                              reviewsResponse?.data?.response?.reviews
+                            ) {
+                              reviewsData = Array.isArray(
+                                reviewsResponse.data.response.reviews
+                              )
+                                ? reviewsResponse.data.response.reviews
+                                : [];
+                            } else if (
+                              Array.isArray(reviewsResponse?.response)
+                            ) {
                               reviewsData = reviewsResponse.response;
-                            } else if (Array.isArray(reviewsResponse?.data?.response)) {
+                            } else if (
+                              Array.isArray(reviewsResponse?.data?.response)
+                            ) {
                               reviewsData = reviewsResponse.data.response;
                             } else if (Array.isArray(reviewsResponse?.data)) {
                               reviewsData = reviewsResponse.data;
@@ -1681,8 +2006,14 @@ const JobDetails = () => {
                               }
                             });
 
-                            const ratedTaskerIds = new Set(reviewsData.map((r: any) => r?.taskerId).filter(Boolean));
-                            const unratedApps = acceptedApps.filter((app: any) => !ratedTaskerIds.has(app.taskerId));
+                            const ratedTaskerIds = new Set(
+                              reviewsData
+                                .map((r: any) => r?.taskerId)
+                                .filter(Boolean)
+                            );
+                            const unratedApps = acceptedApps.filter(
+                              (app: any) => !ratedTaskerIds.has(app.taskerId)
+                            );
 
                             setUnratedCount(unratedApps.length);
                             setAllRated(unratedApps.length === 0);
@@ -1691,9 +2022,17 @@ const JobDetails = () => {
                               acceptedApps.map(async (app: any) => {
                                 try {
                                   const token = getStoredAuthToken();
-                                  const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-                                  const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
-                                  const reviewData = reviewMap.get(app.taskerId) || null;
+                                  const taskerResponse = await GET(
+                                    `/users/${app.taskerId}/public`,
+                                    "",
+                                    token
+                                  );
+                                  const taskerData =
+                                    taskerResponse?.response ||
+                                    taskerResponse?.data ||
+                                    taskerResponse;
+                                  const reviewData =
+                                    reviewMap.get(app.taskerId) || null;
                                   return {
                                     ...app,
                                     taskerInfo: taskerData || null,
@@ -1701,7 +2040,8 @@ const JobDetails = () => {
                                     review: reviewData,
                                   };
                                 } catch (err) {
-                                  const reviewData = reviewMap.get(app.taskerId) || null;
+                                  const reviewData =
+                                    reviewMap.get(app.taskerId) || null;
                                   return {
                                     ...app,
                                     taskerInfo: null,
@@ -1757,7 +2097,10 @@ const JobDetails = () => {
                       Start Task
                     </button>
                     <div className="text-sm text-gray-600 mb-2">
-                      Applications: <span className="font-semibold text-gray-900">{applications.length}</span>
+                      Applications:{" "}
+                      <span className="font-semibold text-gray-900">
+                        {applications.length}
+                      </span>
                     </div>
                   </>
                 )}
@@ -1767,9 +2110,13 @@ const JobDetails = () => {
             {/* Actions (Tasker - when employed) */}
             {isTasker && job && job.status === "in_progress" && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Actions</h3>
-                {applications.some((app: any) => 
-                  app.taskerId === user?.userId && app.status?.toLowerCase() === "accepted"
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Actions
+                </h3>
+                {applications.some(
+                  (app: any) =>
+                    app.taskerId === user?.userId &&
+                    app.status?.toLowerCase() === "accepted"
                 ) && (
                   <button
                     onClick={() => setShowResignModal(true)}
@@ -1784,7 +2131,9 @@ const JobDetails = () => {
             {/* Actions (Tasker - when finished) */}
             {canRateCustomer && (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Actions</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Actions
+                </h3>
                 <button
                   onClick={async () => {
                     const hasReview = await fetchCustomerReviewStatus();
@@ -1810,7 +2159,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Matched Taskers</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Matched Taskers
+                </h2>
                 <button
                   onClick={() => setShowMatches(false)}
                   className="text-gray-400 hover:text-gray-600 transition"
@@ -1832,24 +2183,29 @@ const JobDetails = () => {
                           <h3 className="font-semibold text-gray-900">
                             {match.tasker?.firstName} {match.tasker?.lastName}
                           </h3>
-                          <p className="text-sm text-gray-600">{match.tasker?.expertise}</p>
+                          <p className="text-sm text-gray-600">
+                            {match.tasker?.expertise}
+                          </p>
                         </div>
                         <span className="px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-sm font-medium">
                           {match.matchPercentage}% Match
                         </span>
                       </div>
-                      {match.tasker?.skills && match.tasker.skills.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {match.tasker.skills.slice(0, 5).map((skill: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {match.tasker?.skills &&
+                        match.tasker.skills.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {match.tasker.skills
+                              .slice(0, 5)
+                              .map((skill: string, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                          </div>
+                        )}
                       <div className="flex items-center gap-3 mt-3">
                         <Link
                           to={`/users/${match.tasker?.userId}`}
@@ -1860,13 +2216,18 @@ const JobDetails = () => {
                         {isOwner && job && job.status === "open" && (
                           <>
                             {match.application ? (
-                              match.application.status === 'accepted' ? (
+                              match.application.status === "accepted" ? (
                                 <span className="ml-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
                                   Hired
                                 </span>
                               ) : (
                                 <button
-                                  onClick={() => handleHireTasker(match.tasker?.userId, match.application?.applicationId)}
+                                  onClick={() =>
+                                    handleHireTasker(
+                                      match.tasker?.userId,
+                                      match.application?.applicationId
+                                    )
+                                  }
                                   className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                                 >
                                   Hire
@@ -1902,7 +2263,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Job Applications</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Job Applications
+                </h2>
                 <button
                   onClick={() => {
                     setShowApplicationsModal(false);
@@ -1935,11 +2298,12 @@ const JobDetails = () => {
                           {app.taskerInfo ? (
                             <>
                               <h3 className="font-semibold text-gray-900 text-lg">
-                                {app.taskerInfo.firstName} {app.taskerInfo.lastName}
+                                {app.taskerInfo.firstName}{" "}
+                                {app.taskerInfo.lastName}
                               </h3>
                               {app.taskerInfo.expertise && (
                                 <p className="text-sm text-gray-600 mt-1">
-                                  {Array.isArray(app.taskerInfo.expertise) 
+                                  {Array.isArray(app.taskerInfo.expertise)
                                     ? app.taskerInfo.expertise.join(", ")
                                     : app.taskerInfo.expertise}
                                 </p>
@@ -1951,19 +2315,29 @@ const JobDetails = () => {
                             </h3>
                           )}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          app.status === "accepted" ? "bg-green-200 text-green-800" :
-                          app.status === "rejected" ? "bg-red-200 text-red-800" :
-                          app.status === "withdrawn" ? "bg-gray-100 text-gray-800" :
-                          "bg-yellow-200 text-yellow-800"
-                        }`}>
-                          {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            app.status === "accepted"
+                              ? "bg-green-200 text-green-800"
+                              : app.status === "rejected"
+                              ? "bg-red-200 text-red-800"
+                              : app.status === "withdrawn"
+                              ? "bg-gray-100 text-gray-800"
+                              : "bg-yellow-200 text-yellow-800"
+                          }`}
+                        >
+                          {app.status.charAt(0).toUpperCase() +
+                            app.status.slice(1)}
                         </span>
                       </div>
                       {app.proposedBudget && (
                         <div className="mb-3">
-                          <p className="text-sm text-gray-600">Proposed Budget:</p>
-                          <p className="font-semibold text-gray-900">₱{app.proposedBudget.toLocaleString()}</p>
+                          <p className="text-sm text-gray-600">
+                            Proposed Budget:
+                          </p>
+                          <p className="font-semibold text-gray-900">
+                            ₱{app.proposedBudget.toLocaleString()}
+                          </p>
                         </div>
                       )}
                       {app.coverLetter && (
@@ -2010,7 +2384,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Application Details</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Application Details
+                </h2>
                 <button
                   onClick={() => {
                     setViewingApplication(null);
@@ -2037,32 +2413,44 @@ const JobDetails = () => {
                   </div>
                   {viewingTasker.expertise && (
                     <div className="mb-3">
-                      <span className="text-sm font-medium text-gray-700">Expertise: </span>
+                      <span className="text-sm font-medium text-gray-700">
+                        Expertise:{" "}
+                      </span>
                       <span className="text-sm text-gray-600">
-                        {Array.isArray(viewingTasker.expertise) 
+                        {Array.isArray(viewingTasker.expertise)
                           ? viewingTasker.expertise.join(", ")
                           : viewingTasker.expertise}
                       </span>
                     </div>
                   )}
-                  {viewingTasker.skills && Array.isArray(viewingTasker.skills) && viewingTasker.skills.length > 0 ? (
+                  {viewingTasker.skills &&
+                  Array.isArray(viewingTasker.skills) &&
+                  viewingTasker.skills.length > 0 ? (
                     <div className="mb-3">
-                      <span className="text-sm font-medium text-gray-700">Skills: </span>
+                      <span className="text-sm font-medium text-gray-700">
+                        Skills:{" "}
+                      </span>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {viewingTasker.skills.map((skill: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
-                          >
-                            {skill}
-                          </span>
-                        ))}
+                        {viewingTasker.skills.map(
+                          (skill: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
+                            >
+                              {skill}
+                            </span>
+                          )
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="mb-3">
-                      <span className="text-sm font-medium text-gray-700">Skills: </span>
-                      <span className="text-sm text-gray-500 italic">No skills listed</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        Skills:{" "}
+                      </span>
+                      <span className="text-sm text-gray-500 italic">
+                        No skills listed
+                      </span>
                     </div>
                   )}
                   <Link
@@ -2077,32 +2465,50 @@ const JobDetails = () => {
               {/* Application Info */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Application ID</label>
-                  <p className="text-gray-900">#{viewingApplication.applicationId}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Application ID
+                  </label>
+                  <p className="text-gray-900">
+                    #{viewingApplication.applicationId}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                    viewingApplication.status === "accepted" ? "bg-green-200 text-green-800" :
-                    viewingApplication.status === "rejected" ? "bg-red-200 text-red-800" :
-                    viewingApplication.status === "withdrawn" ? "bg-gray-100 text-gray-800" :
-                    "bg-yellow-200 text-yellow-800"
-                  }`}>
-                    {viewingApplication.status.charAt(0).toUpperCase() + viewingApplication.status.slice(1)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                      viewingApplication.status === "accepted"
+                        ? "bg-green-200 text-green-800"
+                        : viewingApplication.status === "rejected"
+                        ? "bg-red-200 text-red-800"
+                        : viewingApplication.status === "withdrawn"
+                        ? "bg-gray-100 text-gray-800"
+                        : "bg-yellow-200 text-yellow-800"
+                    }`}
+                  >
+                    {viewingApplication.status.charAt(0).toUpperCase() +
+                      viewingApplication.status.slice(1)}
                   </span>
                 </div>
 
                 {viewingApplication.proposedBudget && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Proposed Budget</label>
-                    <p className="text-gray-900 font-semibold">₱{viewingApplication.proposedBudget.toLocaleString()}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Proposed Budget
+                    </label>
+                    <p className="text-gray-900 font-semibold">
+                      ₱{viewingApplication.proposedBudget.toLocaleString()}
+                    </p>
                   </div>
                 )}
 
                 {viewingApplication.coverLetter && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Letter</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cover Letter
+                    </label>
                     <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
                       {viewingApplication.coverLetter}
                     </p>
@@ -2110,50 +2516,73 @@ const JobDetails = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Applied On</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Applied On
+                  </label>
                   <p className="text-gray-900">
                     {new Date(viewingApplication.createdAt).toLocaleString()}
                   </p>
                 </div>
 
-                {viewingApplication.status?.toLowerCase() === "accepted" && viewingApplication.updatedAt && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hired On</label>
-                    <p className="text-gray-900">
-                      {new Date(viewingApplication.updatedAt).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+                {viewingApplication.status?.toLowerCase() === "accepted" &&
+                  viewingApplication.updatedAt && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Hired On
+                      </label>
+                      <p className="text-gray-900">
+                        {new Date(
+                          viewingApplication.updatedAt
+                        ).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
 
-                {viewingApplication.status?.toLowerCase() === "rejected" && viewingApplication.updatedAt && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rejected On</label>
-                    <p className="text-gray-900">
-                      {new Date(viewingApplication.updatedAt).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+                {viewingApplication.status?.toLowerCase() === "rejected" &&
+                  viewingApplication.updatedAt && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rejected On
+                      </label>
+                      <p className="text-gray-900">
+                        {new Date(
+                          viewingApplication.updatedAt
+                        ).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
               </div>
 
               <div className="mt-6 pt-4 border-t border-gray-200">
-                {isOwner && job && job.status === "open" && viewingApplication.status === "pending" && (
-                  <div className="flex gap-3 mb-3">
-                    <button
-                      onClick={() => handleAcceptApplication(viewingApplication.applicationId)}
-                      disabled={processingApplication}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {processingApplication ? "Processing..." : "Hire"}
-                    </button>
-                    <button
-                      onClick={() => handleRejectApplication(viewingApplication.applicationId)}
-                      disabled={processingApplication}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {processingApplication ? "Processing..." : "Reject"}
-                    </button>
-                  </div>
-                )}
+                {isOwner &&
+                  job &&
+                  job.status === "open" &&
+                  viewingApplication.status === "pending" && (
+                    <div className="flex gap-3 mb-3">
+                      <button
+                        onClick={() =>
+                          handleAcceptApplication(
+                            viewingApplication.applicationId
+                          )
+                        }
+                        disabled={processingApplication}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {processingApplication ? "Processing..." : "Hire"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleRejectApplication(
+                            viewingApplication.applicationId
+                          )
+                        }
+                        disabled={processingApplication}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {processingApplication ? "Processing..." : "Reject"}
+                      </button>
+                    </div>
+                  )}
                 <div className="flex gap-3">
                   {viewingTasker && (
                     <Link
@@ -2189,7 +2618,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Start Task</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Start Task
+                </h2>
                 <button
                   onClick={() => setShowStartTaskModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition"
@@ -2200,10 +2631,12 @@ const JobDetails = () => {
               </div>
               <div className="mb-6">
                 <p className="text-gray-700 mb-2">
-                  Are you sure you want to start this task? This will change the job status to "Ongoing".
+                  Are you sure you want to start this task? This will change the
+                  job status to "Ongoing".
                 </p>
                 <p className="text-sm text-gray-500">
-                  This action will notify the hired tasker(s) and mark the job as in progress.
+                  This action will notify the hired tasker(s) and mark the job
+                  as in progress.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -2236,7 +2669,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Taskers</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Taskers
+                </h2>
                 <button
                   onClick={() => setShowTaskersModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition"
@@ -2290,7 +2725,9 @@ const JobDetails = () => {
                   {taskersTab === "active" && (
                     <div>
                       {activeTaskers.length === 0 ? (
-                        <p className="text-gray-500 text-sm text-center py-8">No active taskers</p>
+                        <p className="text-gray-500 text-sm text-center py-8">
+                          No active taskers
+                        </p>
                       ) : (
                         <div className="space-y-3">
                           {activeTaskers.map((app: any) => (
@@ -2303,7 +2740,8 @@ const JobDetails = () => {
                                   {app.taskerInfo ? (
                                     <>
                                       <h4 className="font-semibold text-gray-900">
-                                        {app.taskerInfo.firstName} {app.taskerInfo.lastName}
+                                        {app.taskerInfo.firstName}{" "}
+                                        {app.taskerInfo.lastName}
                                       </h4>
                                       <p className="text-sm text-gray-600 mt-1">
                                         ID: {app.taskerId}
@@ -2348,7 +2786,9 @@ const JobDetails = () => {
                   {taskersTab === "fired" && (
                     <div>
                       {firedTaskers.length === 0 ? (
-                        <p className="text-gray-500 text-sm text-center py-8">No fired taskers</p>
+                        <p className="text-gray-500 text-sm text-center py-8">
+                          No fired taskers
+                        </p>
                       ) : (
                         <div className="space-y-3">
                           {firedTaskers.map((app: any) => (
@@ -2361,7 +2801,8 @@ const JobDetails = () => {
                                   {app.taskerInfo ? (
                                     <>
                                       <h4 className="font-semibold text-gray-900">
-                                        {app.taskerInfo.firstName} {app.taskerInfo.lastName}
+                                        {app.taskerInfo.firstName}{" "}
+                                        {app.taskerInfo.lastName}
                                       </h4>
                                       <p className="text-sm text-gray-600 mt-1">
                                         ID: {app.taskerId}
@@ -2387,7 +2828,9 @@ const JobDetails = () => {
                                   </Link>
                                 )}
                                 <button
-                                  onClick={() => handleViewTerminationDetails(app)}
+                                  onClick={() =>
+                                    handleViewTerminationDetails(app)
+                                  }
                                   className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                                 >
                                   Termination Details
@@ -2403,7 +2846,9 @@ const JobDetails = () => {
                   {taskersTab === "resigned" && (
                     <div>
                       {resignedTaskers.length === 0 ? (
-                        <p className="text-gray-500 text-sm text-center py-8">No resigned taskers</p>
+                        <p className="text-gray-500 text-sm text-center py-8">
+                          No resigned taskers
+                        </p>
                       ) : (
                         <div className="space-y-3">
                           {resignedTaskers.map((app: any) => (
@@ -2416,7 +2861,8 @@ const JobDetails = () => {
                                   {app.taskerInfo ? (
                                     <>
                                       <h4 className="font-semibold text-gray-900">
-                                        {app.taskerInfo.firstName} {app.taskerInfo.lastName}
+                                        {app.taskerInfo.firstName}{" "}
+                                        {app.taskerInfo.lastName}
                                       </h4>
                                       <p className="text-sm text-gray-600 mt-1">
                                         ID: {app.taskerId}
@@ -2442,7 +2888,9 @@ const JobDetails = () => {
                                   </Link>
                                 )}
                                 <button
-                                  onClick={() => handleViewResignationDetails(app)}
+                                  onClick={() =>
+                                    handleViewResignationDetails(app)
+                                  }
                                   className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                                 >
                                   Resignation Details
@@ -2476,7 +2924,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Terminate Tasker</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Terminate Tasker
+                </h2>
                 <button
                   onClick={() => {
                     if (!terminating) {
@@ -2494,7 +2944,11 @@ const JobDetails = () => {
               <div className="mb-4">
                 {terminatingApplication.taskerInfo && (
                   <p className="text-sm text-gray-700 mb-2">
-                    Terminating: <span className="font-semibold">{terminatingApplication.taskerInfo.firstName} {terminatingApplication.taskerInfo.lastName}</span>
+                    Terminating:{" "}
+                    <span className="font-semibold">
+                      {terminatingApplication.taskerInfo.firstName}{" "}
+                      {terminatingApplication.taskerInfo.lastName}
+                    </span>
                   </p>
                 )}
               </div>
@@ -2554,7 +3008,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Termination Details</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Termination Details
+                </h2>
                 <button
                   onClick={() => {
                     setShowTerminationDetailsModal(false);
@@ -2568,23 +3024,33 @@ const JobDetails = () => {
               <div className="space-y-4">
                 {viewingTerminationDetails.taskerInfo && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tasker</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tasker
+                    </label>
                     <p className="text-gray-900">
-                      {viewingTerminationDetails.taskerInfo.firstName} {viewingTerminationDetails.taskerInfo.lastName}
+                      {viewingTerminationDetails.taskerInfo.firstName}{" "}
+                      {viewingTerminationDetails.taskerInfo.lastName}
                     </p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Termination</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason for Termination
+                  </label>
                   <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
-                    {viewingTerminationDetails.coverLetter || "No reason provided"}
+                    {viewingTerminationDetails.coverLetter ||
+                      "No reason provided"}
                   </p>
                 </div>
                 {viewingTerminationDetails.updatedAt && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Terminated On</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Terminated On
+                    </label>
                     <p className="text-gray-900">
-                      {new Date(viewingTerminationDetails.updatedAt).toLocaleString()}
+                      {new Date(
+                        viewingTerminationDetails.updatedAt
+                      ).toLocaleString()}
                     </p>
                   </div>
                 )}
@@ -2617,7 +3083,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Resignation Details</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Resignation Details
+                </h2>
                 <button
                   onClick={() => {
                     setShowResignationDetailsModal(false);
@@ -2631,23 +3099,33 @@ const JobDetails = () => {
               <div className="space-y-4">
                 {viewingResignationDetails.taskerInfo && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tasker</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tasker
+                    </label>
                     <p className="text-gray-900">
-                      {viewingResignationDetails.taskerInfo.firstName} {viewingResignationDetails.taskerInfo.lastName}
+                      {viewingResignationDetails.taskerInfo.firstName}{" "}
+                      {viewingResignationDetails.taskerInfo.lastName}
                     </p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Resignation</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason for Resignation
+                  </label>
                   <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
-                    {viewingResignationDetails.coverLetter || "No reason provided"}
+                    {viewingResignationDetails.coverLetter ||
+                      "No reason provided"}
                   </p>
                 </div>
                 {viewingResignationDetails.updatedAt && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Resigned On</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Resigned On
+                    </label>
                     <p className="text-gray-900">
-                      {new Date(viewingResignationDetails.updatedAt).toLocaleString()}
+                      {new Date(
+                        viewingResignationDetails.updatedAt
+                      ).toLocaleString()}
                     </p>
                   </div>
                 )}
@@ -2669,7 +3147,7 @@ const JobDetails = () => {
 
         {/* Resign Modal */}
         {showResignModal && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-70 flex items-center justify-center p-4">
             <div
               className="absolute inset-0 bg-black/30 backdrop-blur-md"
               onClick={() => {
@@ -2682,7 +3160,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Resign from Job</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Resign from Job
+                </h2>
                 <button
                   onClick={() => {
                     if (!resigning) {
@@ -2748,7 +3228,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Rate Taskers</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Rate Taskers
+                </h2>
                 <button
                   onClick={() => setShowRateTaskersModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition"
@@ -2772,7 +3254,8 @@ const JobDetails = () => {
                           : "text-gray-600 hover:text-gray-900"
                       }`}
                     >
-                      To Rate ({taskersToRate.filter((t: any) => !t.isRated).length})
+                      To Rate (
+                      {taskersToRate.filter((t: any) => !t.isRated).length})
                     </button>
                     <button
                       onClick={() => setRateTaskersTab("rated")}
@@ -2782,14 +3265,16 @@ const JobDetails = () => {
                           : "text-gray-600 hover:text-gray-900"
                       }`}
                     >
-                      Rated ({taskersToRate.filter((t: any) => t.isRated).length})
+                      Rated (
+                      {taskersToRate.filter((t: any) => t.isRated).length})
                     </button>
                   </div>
 
                   {/* Tab Content */}
                   {rateTaskersTab === "to-rate" ? (
                     <div>
-                      {taskersToRate.filter((t: any) => !t.isRated).length === 0 ? (
+                      {taskersToRate.filter((t: any) => !t.isRated).length ===
+                      0 ? (
                         <div className="text-center py-8">
                           <p className="text-gray-500">No taskers to rate</p>
                         </div>
@@ -2807,7 +3292,8 @@ const JobDetails = () => {
                                     {tasker.taskerInfo ? (
                                       <>
                                         <h4 className="font-semibold text-gray-900">
-                                          {tasker.taskerInfo.firstName} {tasker.taskerInfo.lastName}
+                                          {tasker.taskerInfo.firstName}{" "}
+                                          {tasker.taskerInfo.lastName}
                                         </h4>
                                         <p className="text-sm text-gray-600 mt-1">
                                           ID: {tasker.taskerId}
@@ -2838,7 +3324,8 @@ const JobDetails = () => {
                     </div>
                   ) : (
                     <div>
-                      {taskersToRate.filter((t: any) => t.isRated).length === 0 ? (
+                      {taskersToRate.filter((t: any) => t.isRated).length ===
+                      0 ? (
                         <div className="text-center py-8">
                           <p className="text-gray-500">No rated taskers</p>
                         </div>
@@ -2856,7 +3343,8 @@ const JobDetails = () => {
                                     {tasker.taskerInfo ? (
                                       <>
                                         <h4 className="font-semibold text-gray-900">
-                                          {tasker.taskerInfo.firstName} {tasker.taskerInfo.lastName}
+                                          {tasker.taskerInfo.firstName}{" "}
+                                          {tasker.taskerInfo.lastName}
                                         </h4>
                                         <p className="text-sm text-gray-600 mt-1">
                                           ID: {tasker.taskerId}
@@ -2869,11 +3357,16 @@ const JobDetails = () => {
                                         </h4>
                                       </>
                                     )}
-                                    {typeof tasker.review?.rating === "number" && (
+                                    {typeof tasker.review?.rating ===
+                                      "number" && (
                                       <div className="mt-2 flex items-center gap-1 text-sm text-gray-700">
-                                        <FiStar className="text-yellow-400" />
-                                        <span className="font-semibold">{tasker.review.rating}</span>
-                                        <span className="text-gray-500">/ 5</span>
+                                        <FaStar className="text-yellow-400" />
+                                        <span className="font-semibold">
+                                          {tasker.review.rating}
+                                        </span>
+                                        <span className="text-gray-500">
+                                          / 5
+                                        </span>
                                       </div>
                                     )}
                                   </div>
@@ -2894,7 +3387,9 @@ const JobDetails = () => {
                                         : "bg-blue-600 text-white hover:bg-blue-700"
                                     }`}
                                   >
-                                    {tasker.review?.edited ? "Already Edited" : "Edit Rating"}
+                                    {tasker.review?.edited
+                                      ? "Already Edited"
+                                      : "Edit Rating"}
                                   </button>
                                 </div>
                               </div>
@@ -2919,7 +3414,9 @@ const JobDetails = () => {
             />
             <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Rate Customer</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  Rate Customer
+                </h2>
                 <button
                   onClick={() => setShowRateCustomerModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition"
@@ -2969,7 +3466,9 @@ const JobDetails = () => {
                               <h4 className="font-semibold text-gray-900">
                                 {posterName || "Customer"}
                               </h4>
-                              <p className="text-sm text-gray-600 mt-1">ID: {job.customerId}</p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                ID: {job.customerId}
+                              </p>
                             </div>
                             <button
                               onClick={() => {
@@ -2996,11 +3495,15 @@ const JobDetails = () => {
                             <h4 className="font-semibold text-gray-900">
                               {posterName || "Customer"}
                             </h4>
-                            <p className="text-sm text-gray-600 mt-1">ID: {job.customerId}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              ID: {job.customerId}
+                            </p>
                             {typeof customerReview?.rating === "number" && (
                               <div className="mt-2 flex items-center gap-1 text-sm text-gray-700">
                                 <FiStar className="text-yellow-400" />
-                                <span className="font-semibold">{customerReview.rating}</span>
+                                <span className="font-semibold">
+                                  {customerReview.rating}
+                                </span>
                                 <span className="text-gray-500">/ 5</span>
                               </div>
                             )}
@@ -3023,7 +3526,9 @@ const JobDetails = () => {
                                 : "bg-blue-600 text-white hover:bg-blue-700"
                             }`}
                           >
-                            {customerReview?.edited ? "Already Edited" : "Edit Rating"}
+                            {customerReview?.edited
+                              ? "Already Edited"
+                              : "Edit Rating"}
                           </button>
                         </div>
                       </div>
@@ -3046,7 +3551,7 @@ const JobDetails = () => {
             onSuccess={async () => {
               // Reset the ref to allow re-checking after rating
               ratingsCheckedRef.current = false;
-              
+
               // Refresh ratings check
               if (job) {
                 try {
@@ -3058,11 +3563,19 @@ const JobDetails = () => {
                   if (acceptedApps.length > 0) {
                     const reviewsResponse = await getJobReviews(job.jobId);
                     let reviewsData: any[] = [];
-                    
+
                     if (reviewsResponse?.response?.reviews) {
-                      reviewsData = Array.isArray(reviewsResponse.response.reviews) ? reviewsResponse.response.reviews : [];
+                      reviewsData = Array.isArray(
+                        reviewsResponse.response.reviews
+                      )
+                        ? reviewsResponse.response.reviews
+                        : [];
                     } else if (reviewsResponse?.data?.response?.reviews) {
-                      reviewsData = Array.isArray(reviewsResponse.data.response.reviews) ? reviewsResponse.data.response.reviews : [];
+                      reviewsData = Array.isArray(
+                        reviewsResponse.data.response.reviews
+                      )
+                        ? reviewsResponse.data.response.reviews
+                        : [];
                     } else if (Array.isArray(reviewsResponse?.response)) {
                       reviewsData = reviewsResponse.response;
                     } else if (Array.isArray(reviewsResponse?.data?.response)) {
@@ -3083,8 +3596,12 @@ const JobDetails = () => {
                       }
                     });
 
-                    const ratedTaskerIds = new Set(reviewsData.map((r: any) => r?.taskerId).filter(Boolean));
-                    const unratedApps = acceptedApps.filter((app: any) => !ratedTaskerIds.has(app.taskerId));
+                    const ratedTaskerIds = new Set(
+                      reviewsData.map((r: any) => r?.taskerId).filter(Boolean)
+                    );
+                    const unratedApps = acceptedApps.filter(
+                      (app: any) => !ratedTaskerIds.has(app.taskerId)
+                    );
 
                     setUnratedCount(unratedApps.length);
                     setAllRated(unratedApps.length === 0);
@@ -3093,9 +3610,17 @@ const JobDetails = () => {
                       acceptedApps.map(async (app: any) => {
                         try {
                           const token = getStoredAuthToken();
-                          const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-                          const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
-                          const reviewData = reviewMap.get(app.taskerId) || null;
+                          const taskerResponse = await GET(
+                            `/users/${app.taskerId}/public`,
+                            "",
+                            token
+                          );
+                          const taskerData =
+                            taskerResponse?.response ||
+                            taskerResponse?.data ||
+                            taskerResponse;
+                          const reviewData =
+                            reviewMap.get(app.taskerId) || null;
                           return {
                             ...app,
                             taskerInfo: taskerData || null,
@@ -3103,7 +3628,8 @@ const JobDetails = () => {
                             review: reviewData,
                           };
                         } catch (err) {
-                          const reviewData = reviewMap.get(app.taskerId) || null;
+                          const reviewData =
+                            reviewMap.get(app.taskerId) || null;
                           return {
                             ...app,
                             taskerInfo: null,
@@ -3143,7 +3669,7 @@ const JobDetails = () => {
             onSuccess={async () => {
               // Reset the ref to allow re-checking after editing
               ratingsCheckedRef.current = false;
-              
+
               // Refresh ratings check
               if (job) {
                 try {
@@ -3154,23 +3680,41 @@ const JobDetails = () => {
 
                   if (acceptedApps.length > 0) {
                     const reviewsResponse = await getJobReviews(job.jobId);
-                    console.log("Reviews response (edit onSuccess):", reviewsResponse);
+                    console.log(
+                      "Reviews response (edit onSuccess):",
+                      reviewsResponse
+                    );
                     let reviewsData: any[] = [];
-                    
+
                     // GET returns response.data which is { status, response: { reviews: [...] }, message }
-                    if (reviewsResponse?.response?.reviews && Array.isArray(reviewsResponse.response.reviews)) {
+                    if (
+                      reviewsResponse?.response?.reviews &&
+                      Array.isArray(reviewsResponse.response.reviews)
+                    ) {
                       reviewsData = reviewsResponse.response.reviews;
-                    } else if (reviewsResponse?.data?.response?.reviews && Array.isArray(reviewsResponse.data.response.reviews)) {
+                    } else if (
+                      reviewsResponse?.data?.response?.reviews &&
+                      Array.isArray(reviewsResponse.data.response.reviews)
+                    ) {
                       reviewsData = reviewsResponse.data.response.reviews;
-                    } else if (reviewsResponse?.response && Array.isArray(reviewsResponse.response)) {
+                    } else if (
+                      reviewsResponse?.response &&
+                      Array.isArray(reviewsResponse.response)
+                    ) {
                       reviewsData = reviewsResponse.response;
-                    } else if (reviewsResponse?.data?.response && Array.isArray(reviewsResponse.data.response)) {
+                    } else if (
+                      reviewsResponse?.data?.response &&
+                      Array.isArray(reviewsResponse.data.response)
+                    ) {
                       reviewsData = reviewsResponse.data.response;
                     } else if (Array.isArray(reviewsResponse?.data)) {
                       reviewsData = reviewsResponse.data;
                     }
-                    
-                    console.log("Extracted reviews data (edit onSuccess):", reviewsData);
+
+                    console.log(
+                      "Extracted reviews data (edit onSuccess):",
+                      reviewsData
+                    );
 
                     const ratedTaskerIds = new Set(
                       reviewsData.map((review: any) => review.taskerId)
@@ -3197,8 +3741,15 @@ const JobDetails = () => {
                       acceptedApps.map(async (app: any) => {
                         try {
                           const token = getStoredAuthToken();
-                          const taskerResponse = await GET(`/users/${app.taskerId}/public`, "", token);
-                          const taskerData = taskerResponse?.response || taskerResponse?.data || taskerResponse;
+                          const taskerResponse = await GET(
+                            `/users/${app.taskerId}/public`,
+                            "",
+                            token
+                          );
+                          const taskerData =
+                            taskerResponse?.response ||
+                            taskerResponse?.data ||
+                            taskerResponse;
                           const reviewData = reviewMap.get(app.taskerId);
                           return {
                             ...app,
@@ -3207,7 +3758,10 @@ const JobDetails = () => {
                             review: reviewData || null,
                           };
                         } catch (err) {
-                          console.error(`Failed to fetch tasker ${app.taskerId}:`, err);
+                          console.error(
+                            `Failed to fetch tasker ${app.taskerId}:`,
+                            err
+                          );
                           const reviewData = reviewMap.get(app.taskerId);
                           return {
                             ...app,
@@ -3274,4 +3828,3 @@ const JobDetails = () => {
 };
 
 export default JobDetails;
-

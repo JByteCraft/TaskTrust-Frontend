@@ -945,7 +945,6 @@ const BrowseJobs = () => {
                         aria-label="Filter jobs by employment status"
                       >
                         <option value="all">All Employment Status</option>
-                        <option value="pending">Pending</option>
                         <option value="accepted">Accepted</option>
                         <option value="rejected">Fired</option>
                         <option value="withdrawn">Resigned</option>
