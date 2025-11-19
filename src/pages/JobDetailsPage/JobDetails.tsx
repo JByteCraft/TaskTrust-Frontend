@@ -1543,7 +1543,7 @@ const JobDetails = () => {
                   Status Overview
                 </h3>
                 <div className="space-y-3 text-sm">
-                  {hasApplied && currentApplication && (
+                  {hasApplied && currentApplication && job?.status !== "in_progress" && (
                     <div>
                       <span className="text-gray-600">Application Status:</span>
                       <span
@@ -1564,7 +1564,8 @@ const JobDetails = () => {
                     </div>
                   )}
 
-                  {(() => {
+                  {job?.status !== "in_progress" &&
+                    (() => {
                     if (!currentApplication?.status) return null;
                     const statusLower = currentApplication.status.toLowerCase();
                     let employmentLabel = "";
@@ -1590,7 +1591,7 @@ const JobDetails = () => {
                         <span className={employmentClasses}>{employmentLabel}</span>
                       </div>
                     );
-                  })()}
+                    })()}
 
                   {currentApplication?.status &&
                     currentApplication.status.toLowerCase() === "accepted" && (
