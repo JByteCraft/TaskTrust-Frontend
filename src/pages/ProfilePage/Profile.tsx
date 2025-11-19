@@ -401,18 +401,22 @@ const Profile = () => {
     if (!token) return;
 
     try {
-      // Get accepted applications for this user
-      // axios returns: { data: { status, response, message } }
-      const appsResponse = await getApplications({ taskerId: targetUserId, status: 'accepted' });
+      // Get all applications for this tasker (accepted, fired, resigned - any employment status)
+      // We'll filter for completed/finished jobs regardless of final employment status
+      const appsResponse = await getApplications({ taskerId: targetUserId });
       let appsData: any[] = [];
       if (appsResponse?.data?.response && Array.isArray(appsResponse.data.response)) {
         appsData = appsResponse.data.response;
       } else if (Array.isArray(appsResponse?.data)) {
         appsData = appsResponse.data;
       }
-      const acceptedApps = appsData;
 
-      // Get job details for each accepted application
+      // Filter to only accepted applications (taskers who were hired)
+      const acceptedApps = appsData.filter((app: any) => 
+        app.status?.toLowerCase() === 'accepted'
+      );
+
+      // Get job details for each accepted application and check if job is completed/finished
       const platformProjectsList: any[] = [];
       for (const app of acceptedApps) {
         try {
@@ -424,18 +428,40 @@ const Profile = () => {
           } else if (jobResponse?.data && typeof jobResponse.data === 'object' && jobResponse.data.jobId) {
             jobData = jobResponse.data;
           }
-          if (jobData && (jobData.status === 'completed' || jobData.status === 'in_progress')) {
+          
+          // Only include completed or finished jobs
+          if (jobData && (jobData.status === 'completed' || jobData.status === 'finished')) {
+            // Fetch customer name for better display
+            let customerName = 'Client';
+            try {
+              if (jobData.customerId) {
+                const customerResponse = await GET(`/users/${jobData.customerId}/public`, "", token);
+                const customerData = customerResponse?.response || customerResponse?.data || customerResponse;
+                if (customerData?.firstName && customerData?.lastName) {
+                  customerName = `${customerData.firstName} ${customerData.lastName}`;
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to fetch customer ${jobData.customerId}:`, err);
+            }
+
             platformProjectsList.push({
               portfolioId: `platform-${app.jobId}`,
               type: 'project',
               source: 'platform',
               jobId: app.jobId,
               title: jobData.title || `Job #${app.jobId}`,
-              description: jobData.description,
-              company: jobData.customerId ? 'Client' : undefined,
+              description: jobData.description || '',
+              company: customerName,
+              location: jobData.city && jobData.province 
+                ? `${jobData.city}, ${jobData.province}` 
+                : jobData.city || jobData.province || '',
               dateStarted: jobData.createdAt,
-              dateEnd: jobData.status === 'completed' ? jobData.updatedAt : undefined,
+              dateEnd: jobData.updatedAt || jobData.createdAt,
               skills: jobData.requiredSkills || [],
+              expertise: jobData.requiredExpertise ? [jobData.requiredExpertise] : [],
+              budget: jobData.budget,
+              status: jobData.status,
             });
           }
         } catch (err) {
@@ -443,9 +469,17 @@ const Profile = () => {
         }
       }
 
+      // Sort by completion date (most recent first)
+      platformProjectsList.sort((a, b) => {
+        const dateA = new Date(a.dateEnd).getTime();
+        const dateB = new Date(b.dateEnd).getTime();
+        return dateB - dateA;
+      });
+
       setPlatformProjects(platformProjectsList);
     } catch (error) {
       console.error("Load platform projects error:", error);
+      setPlatformProjects([]);
     }
   };
 
@@ -1205,10 +1239,6 @@ const Profile = () => {
                   >
                     {loadingPortfolio ? (
                       <div className="text-center py-8 text-gray-500">Loading portfolio...</div>
-                    ) : portfolioItems.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
-                        No portfolio items yet
-                      </div>
                     ) : (
                       <div className="space-y-6">
                         {/* Platform Projects */}
@@ -1219,9 +1249,11 @@ const Profile = () => {
                             item.title?.toLowerCase().includes(query) ||
                             item.description?.toLowerCase().includes(query) ||
                             item.company?.toLowerCase().includes(query) ||
-                            item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                            item.location?.toLowerCase().includes(query) ||
+                            item.skills?.some((skill: string) => skill.toLowerCase().includes(query)) ||
+                            item.expertise?.some((exp: string) => exp.toLowerCase().includes(query))
                           );
-                        }).length > 0 && (
+                        }).length > 0 ? (
                           <div className="mb-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-3">Platform Projects</h3>
                             <div className="space-y-4 max-h-[480px] overflow-y-auto">
@@ -1233,7 +1265,9 @@ const Profile = () => {
                                     item.title?.toLowerCase().includes(query) ||
                                     item.description?.toLowerCase().includes(query) ||
                                     item.company?.toLowerCase().includes(query) ||
-                                    item.skills?.some((skill: string) => skill.toLowerCase().includes(query))
+                                    item.location?.toLowerCase().includes(query) ||
+                                    item.skills?.some((skill: string) => skill.toLowerCase().includes(query)) ||
+                                    item.expertise?.some((exp: string) => exp.toLowerCase().includes(query))
                                   );
                                 })
                                 .map((item: any) => (
@@ -1252,25 +1286,45 @@ const Profile = () => {
                                         {item.description && (
                                           <p className="text-sm text-gray-600 mb-2">{item.description}</p>
                                         )}
-                                        {item.company && (
-                                          <p className="text-xs text-gray-500">Client: {item.company}</p>
-                                        )}
-                                        {item.dateStarted && (
-                                          <p className="text-xs text-gray-500">
-                                            Started: {new Date(item.dateStarted).toLocaleDateString()}
-                                          </p>
-                                        )}
-                                        {item.dateEnd && (
-                                          <p className="text-xs text-gray-500">
-                                            Completed: {new Date(item.dateEnd).toLocaleDateString()}
-                                          </p>
+                                        <div className="space-y-1 mb-2">
+                                          {item.company && (
+                                            <p className="text-xs text-gray-500">Client: {item.company}</p>
+                                          )}
+                                          {item.location && (
+                                            <p className="text-xs text-gray-500">Location: {item.location}</p>
+                                          )}
+                                          {item.budget && (
+                                            <p className="text-xs text-gray-500">Budget: ₱{item.budget.toLocaleString()}</p>
+                                          )}
+                                          {item.dateStarted && (
+                                            <p className="text-xs text-gray-500">
+                                              Started: {new Date(item.dateStarted).toLocaleDateString()}
+                                            </p>
+                                          )}
+                                          {item.dateEnd && (
+                                            <p className="text-xs text-gray-500">
+                                              Completed: {new Date(item.dateEnd).toLocaleDateString()}
+                                            </p>
+                                          )}
+                                        </div>
+                                        {item.expertise && item.expertise.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-2 mb-2">
+                                            {item.expertise.map((exp: string, idx: number) => (
+                                              <span
+                                                key={idx}
+                                                className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded"
+                                              >
+                                                {exp}
+                                              </span>
+                                            ))}
+                                          </div>
                                         )}
                                         {item.skills && item.skills.length > 0 && (
                                           <div className="flex flex-wrap gap-1 mt-2">
                                             {item.skills.map((skill: string, idx: number) => (
                                               <span
                                                 key={idx}
-                                                className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded"
+                                                className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded"
                                               >
                                                 {skill}
                                               </span>
@@ -1283,6 +1337,12 @@ const Profile = () => {
                                 ))}
                             </div>
                           </div>
+                        ) : (
+                          portfolioItems.length === 0 && (
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                              No portfolio items yet
+                            </div>
+                          )
                         )}
 
                         {/* External Projects */}
