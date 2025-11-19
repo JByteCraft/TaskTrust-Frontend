@@ -1025,10 +1025,9 @@ const Profile = () => {
                     title={rawUserData?.role?.toLowerCase() === "customer" ? "Bio" : "Professional Summary"}
                     description={rawUserData?.role?.toLowerCase() === "customer" ? "About you" : "Your expertise and experience"}
                   >
-                    <div className="space-y-4">
+                    <div className="space-y-0">
                       {/* Bio */}
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Bio</h4>
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
                           {profile.bio
                             ? profile.bio
