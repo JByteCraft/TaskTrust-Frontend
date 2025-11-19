@@ -1543,7 +1543,9 @@ const JobDetails = () => {
                   Status Overview
                 </h3>
                 <div className="space-y-3 text-sm">
-                  {hasApplied && currentApplication && job?.status !== "in_progress" && (
+                  {hasApplied &&
+                    currentApplication &&
+                    job?.status?.toLowerCase() === "open" && (
                     <div>
                       <span className="text-gray-600">Application Status:</span>
                       <span
@@ -1564,8 +1566,7 @@ const JobDetails = () => {
                     </div>
                   )}
 
-                  {job?.status !== "in_progress" &&
-                    (() => {
+                  {(() => {
                     if (!currentApplication?.status) return null;
                     const statusLower = currentApplication.status.toLowerCase();
                     let employmentLabel = "";
@@ -1591,17 +1592,16 @@ const JobDetails = () => {
                         <span className={employmentClasses}>{employmentLabel}</span>
                       </div>
                     );
-                    })()}
+                  })()}
 
-                  {currentApplication?.status &&
-                    currentApplication.status.toLowerCase() === "accepted" && (
-                      <div>
-                        <span className="text-gray-600">Task Status:</span>
-                        <span className="ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800">
-                          {job?.status ? job.status.replace("_", " ").toUpperCase() : "N/A"}
-                        </span>
-                      </div>
-                    )}
+                  {job?.status && (
+                    <div>
+                      <span className="text-gray-600">Task Status:</span>
+                      <span className="ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800">
+                        {job.status.replace("_", " ").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
 
                   {!hasApplied && (
                     <p className="text-gray-500 text-sm">
