@@ -1019,75 +1019,67 @@ const Profile = () => {
             <div className="grid grid-cols-1 gap-0 lg:gap-6 lg:grid-cols-12">
                 {/* Left Sidebar - 30% (Desktop only) */}
                 <div className={`lg:col-span-4 space-y-4 ${activeTab !== "posts" && activeTab !== "summary" && activeTab !== "schedule" && activeTab !== "portfolio" && activeTab !== "education" && activeTab !== "reviews" ? "hidden lg:block" : ""}`}>
-                {/* Bio and Professional Summary */}
+                {/* Professional Summary */}
                 <div className={activeTab === "summary" ? "block" : activeTab === "posts" ? "hidden lg:block" : "hidden"}>
-                  {/* Bio Section */}
                   <ProfileCard
-                    title="Bio"
-                    description="About you"
+                    title={rawUserData?.role?.toLowerCase() === "customer" ? "Bio" : "Professional Summary"}
+                    description={rawUserData?.role?.toLowerCase() === "customer" ? "About you" : "Your expertise and experience"}
                   >
-                    <div className="space-y-3">
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                        {profile.bio
-                          ? profile.bio
-                          : "Add your bio to tell others about yourself."}
+                    <div className="space-y-4">
+                      {/* Bio */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Bio</h4>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                          {profile.bio
+                            ? profile.bio
+                            : "Add your bio to tell others about yourself."}
+                        </div>
                       </div>
+
+                      {/* Expertises (Tasker only) */}
+                      {rawUserData?.role?.toLowerCase() === "tasker" && rawUserData?.expertise && Array.isArray(rawUserData.expertise) && rawUserData.expertise.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Expertise</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {rawUserData.expertise.map((exp: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
+                              >
+                                {exp}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Skills (Tasker only) */}
+                      {rawUserData?.role?.toLowerCase() === "tasker" && rawUserData?.skills && Array.isArray(rawUserData.skills) && rawUserData.skills.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Skills</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {rawUserData.skills.map((skill: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Empty state for taskers (no expertise/skills) */}
+                      {rawUserData?.role?.toLowerCase() === "tasker" && 
+                       (!rawUserData?.expertise || rawUserData.expertise.length === 0) && 
+                       (!rawUserData?.skills || rawUserData.skills.length === 0) && (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Add your expertise and skills in Edit Profile to showcase your capabilities.
+                        </div>
+                      )}
                     </div>
                   </ProfileCard>
-
-                  {/* Professional Summary (Tasker only) */}
-                  {rawUserData?.role?.toLowerCase() === "tasker" && (
-                    <div className="mt-4">
-                      <ProfileCard
-                        title="Professional Summary"
-                        description="Your expertise and experience"
-                      >
-                        <div className="space-y-4">
-                          {/* Expertises */}
-                          {rawUserData?.expertise && Array.isArray(rawUserData.expertise) && rawUserData.expertise.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-2">Expertise</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {rawUserData.expertise.map((exp: string, idx: number) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-                                  >
-                                    {exp}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Skills */}
-                          {rawUserData?.skills && Array.isArray(rawUserData.skills) && rawUserData.skills.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-2">Skills</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {rawUserData.skills.map((skill: string, idx: number) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-                                  >
-                                    {skill}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Empty state */}
-                          {(!rawUserData?.expertise || rawUserData.expertise.length === 0) && 
-                           (!rawUserData?.skills || rawUserData.skills.length === 0) && (
-                            <div className="text-sm text-gray-500 text-center py-4">
-                              Add your expertise and skills in Edit Profile to showcase your capabilities.
-                            </div>
-                          )}
-                        </div>
-                      </ProfileCard>
-                    </div>
-                  )}
 
                   {/* Verification Status */}
                   <div className="mt-4">
