@@ -28,6 +28,7 @@ const UploadCoverModal: FC<UploadCoverModalProps> = ({
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,6 +173,7 @@ const UploadCoverModal: FC<UploadCoverModalProps> = ({
     if (!previewUrl) return;
     
     try {
+      setUploading(true);
       // Convert data URL to File if needed
       let fileToUpload = selectedFile;
       
@@ -192,6 +194,8 @@ const UploadCoverModal: FC<UploadCoverModalProps> = ({
       setShowCrop(false);
     } catch (error: any) {
       alert(error.message || "Failed to upload image");
+    } finally {
+      setUploading(false);
     }
   };
 

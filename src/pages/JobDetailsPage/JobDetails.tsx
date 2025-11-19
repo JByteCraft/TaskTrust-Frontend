@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { FiMapPin, FiClock, FiUser, FiCheckCircle, FiX, FiEye } from "react-icons/fi";
+import { FiMapPin, FiClock, FiUser, FiCheckCircle, FiX, FiEye, FiStar } from "react-icons/fi";
 import { getJob, getJobMatches, getMatchPercentage, updateJob } from "../../lib/api/jobs.api";
 import { createApplication, getJobApplications, getApplications, updateApplication } from "../../lib/api/applications.api";
 import { getStoredAuthToken, getAuthenticatedUserFromToken } from "../../lib/utils/auth.utils";
@@ -2677,6 +2677,13 @@ const JobDetails = () => {
                                           Tasker ID: {tasker.taskerId}
                                         </h4>
                                       </>
+                                    )}
+                                    {typeof tasker.review?.rating === "number" && (
+                                      <div className="mt-2 flex items-center gap-1 text-sm text-gray-700">
+                                        <FiStar className="text-yellow-400" />
+                                        <span className="font-semibold">{tasker.review.rating}</span>
+                                        <span className="text-gray-500">/ 5</span>
+                                      </div>
                                     )}
                                   </div>
                                   <button
