@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { FiMapPin, FiClock, FiUser, FiCheckCircle, FiX, FiEye, FiStar } from "react-icons/fi";
 import { getJob, getJobMatches, getMatchPercentage, updateJob } from "../../lib/api/jobs.api";
@@ -85,6 +85,14 @@ const JobDetails = () => {
   const [rateTaskersTab, setRateTaskersTab] = useState<"to-rate" | "rated">("to-rate");
   const [editingReview, setEditingReview] = useState<any>(null);
   const [showEditRatingModal, setShowEditRatingModal] = useState(false);
+  const [showRateCustomerModal, setShowRateCustomerModal] = useState(false);
+  const [rateCustomerTab, setRateCustomerTab] = useState<"to-rate" | "rated">("to-rate");
+  const [showCustomerRatingModal, setShowCustomerRatingModal] = useState(false);
+  const [showEditCustomerRatingModal, setShowEditCustomerRatingModal] = useState(false);
+  const [customerReview, setCustomerReview] = useState<any>(null);
+  const [hasRatedCustomer, setHasRatedCustomer] = useState(false);
+  const [checkingCustomerRating, setCheckingCustomerRating] = useState(false);
+  const [editingCustomerReview, setEditingCustomerReview] = useState<any>(null);
   const ratingsCheckedRef = useRef(false);
   const lastJobIdRef = useRef<number | null>(null);
 
@@ -92,6 +100,78 @@ const JobDetails = () => {
   const isTasker = user?.role === "tasker";
   const isCustomer = user?.role === "customer" || user?.role === "admin";
   const isOwner = job && user && job.customerId === user.userId;
+  const jobIdNumber = job?.jobId;
+  const jobCustomerId = job?.customerId;
+  const currentUserId = user?.userId;
+  const userJobApplication = applications.find(
+    (app: any) => app.taskerId === currentUserId
+  );
+  const eligibleTaskerStatuses = ["accepted", "withdrawn"];
+  const isEmployedTasker =
+    !!userJobApplication &&
+    eligibleTaskerStatuses.includes(
+      (userJobApplication.status || "").toLowerCase()
+    );
+  const canRateCustomer =
+    isTasker && job?.status === "finished" && isEmployedTasker;
+  const customersToRateCount = canRateCustomer && !hasRatedCustomer ? 1 : 0;
+  const customersRatedCount = canRateCustomer && hasRatedCustomer ? 1 : 0;
+
+  const fetchCustomerReviewStatus = useCallback(async (): Promise<boolean> => {
+    if (!jobIdNumber || !jobCustomerId || !currentUserId || !canRateCustomer) {
+      setHasRatedCustomer(false);
+      setCustomerReview(null);
+      setCheckingCustomerRating(false);
+      return false;
+    }
+
+    try {
+      setCheckingCustomerRating(true);
+      const reviewsResponse = await getJobReviews(jobIdNumber);
+      let reviewsData: any[] = [];
+
+      if (
+        reviewsResponse?.response?.reviews &&
+        Array.isArray(reviewsResponse.response.reviews)
+      ) {
+        reviewsData = reviewsResponse.response.reviews;
+      } else if (
+        reviewsResponse?.data?.response?.reviews &&
+        Array.isArray(reviewsResponse.data.response.reviews)
+      ) {
+        reviewsData = reviewsResponse.data.response.reviews;
+      } else if (Array.isArray(reviewsResponse?.response)) {
+        reviewsData = reviewsResponse.response;
+      } else if (Array.isArray(reviewsResponse?.data?.response)) {
+        reviewsData = reviewsResponse.data.response;
+      } else if (Array.isArray(reviewsResponse?.data)) {
+        reviewsData = reviewsResponse.data;
+      }
+
+      const existingReview = reviewsData.find(
+        (review: any) =>
+          review?.taskerId === jobCustomerId &&
+          review?.clientId === currentUserId
+      );
+
+      if (existingReview) {
+        setHasRatedCustomer(true);
+        setCustomerReview(existingReview);
+        return true;
+      } else {
+        setHasRatedCustomer(false);
+        setCustomerReview(null);
+        return false;
+      }
+    } catch (error) {
+      console.error("Check customer rating error:", error);
+      setHasRatedCustomer(false);
+      setCustomerReview(null);
+      return false;
+    } finally {
+      setCheckingCustomerRating(false);
+    }
+  }, [jobIdNumber, jobCustomerId, currentUserId, canRateCustomer]);
 
   // Update cooldown timer
   useEffect(() => {
@@ -115,6 +195,10 @@ const JobDetails = () => {
       return () => clearInterval(interval);
     }
   }, [cooldownTime, jobId, user?.userId]);
+
+  useEffect(() => {
+    fetchCustomerReviewStatus();
+  }, [fetchCustomerReviewStatus]);
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -1408,17 +1492,31 @@ const JobDetails = () => {
                 </div>
                 {job.status === "finished" && (
                   <div>
-                    {checkingRatings ? (
-                      <span className="text-gray-500 text-sm">Checking ratings...</span>
-                    ) : allRated ? (
-                      <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
-                        ✓ All Rated
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">
-                        {unratedCount} Tasker{unratedCount !== 1 ? 's' : ''} to Rate
-                      </span>
-                    )}
+                    {isOwner ? (
+                      checkingRatings ? (
+                        <span className="text-gray-500 text-sm">Checking ratings...</span>
+                      ) : allRated ? (
+                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
+                          Customer Rated
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">
+                          {unratedCount} Customer{unratedCount !== 1 ? "s" : ""} to Rate
+                        </span>
+                      )
+                    ) : canRateCustomer ? (
+                      checkingCustomerRating ? (
+                        <span className="text-gray-500 text-sm">Checking ratings...</span>
+                      ) : hasRatedCustomer ? (
+                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
+                          Customer Rated
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-sm font-medium">
+                          {customersToRateCount} Customer{customersToRateCount !== 1 ? "s" : ""} to Rate
+                        </span>
+                      )
+                    ) : null}
                   </div>
                 )}
                 {job.deadline && (
@@ -1437,6 +1535,53 @@ const JobDetails = () => {
                 </div>
               </div>
             </div>
+
+            {/* Application / Task Status */}
+            {isTasker && (
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Status Overview
+                </h3>
+                <div className="space-y-3 text-sm">
+                  {hasApplied && currentApplication && (
+                    <div>
+                      <span className="text-gray-600">Application Status:</span>
+                      <span
+                        className={`ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          (currentApplication.status || "").toLowerCase() === "accepted"
+                            ? "bg-green-100 text-green-800"
+                            : (currentApplication.status || "").toLowerCase() === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : (currentApplication.status || "").toLowerCase() === "rejected"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {currentApplication.status
+                          ? currentApplication.status.replace("_", " ").toUpperCase()
+                          : "N/A"}
+                      </span>
+                    </div>
+                  )}
+
+                  {currentApplication?.status &&
+                    currentApplication.status.toLowerCase() === "accepted" && (
+                      <div>
+                        <span className="text-gray-600">Job / Task Status:</span>
+                        <span className="ml-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800">
+                          {job?.status ? job.status.replace("_", " ").toUpperCase() : "N/A"}
+                        </span>
+                      </div>
+                    )}
+
+                  {!hasApplied && (
+                    <p className="text-gray-500 text-sm">
+                      You have not applied to this job yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Actions (Owner) */}
             {isOwner && (
@@ -1604,6 +1749,23 @@ const JobDetails = () => {
                     Resign
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Actions (Tasker - when finished) */}
+            {canRateCustomer && (
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Actions</h3>
+                <button
+                  onClick={async () => {
+                    const hasReview = await fetchCustomerReviewStatus();
+                    setRateCustomerTab(hasReview ? "rated" : "to-rate");
+                    setShowRateCustomerModal(true);
+                  }}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
+                >
+                  Rate Customer
+                </button>
               </div>
             )}
           </div>
@@ -2718,6 +2880,132 @@ const JobDetails = () => {
           </div>
         )}
 
+        {/* Rate Customer Modal */}
+        {showRateCustomerModal && job && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/30 backdrop-blur-md"
+              onClick={() => setShowRateCustomerModal(false)}
+              role="presentation"
+            />
+            <div className="relative bg-white rounded-lg p-4 sm:p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Rate Customer</h2>
+                <button
+                  onClick={() => setShowRateCustomerModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition"
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
+              </div>
+              {checkingCustomerRating ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading customer...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex border-b border-gray-200 mb-4">
+                    <button
+                      onClick={() => setRateCustomerTab("to-rate")}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition ${
+                        rateCustomerTab === "to-rate"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      To Rate ({customersToRateCount})
+                    </button>
+                    <button
+                      onClick={() => setRateCustomerTab("rated")}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition ${
+                        rateCustomerTab === "rated"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Rated ({customersRatedCount})
+                    </button>
+                  </div>
+
+                  {rateCustomerTab === "to-rate" ? (
+                    customersToRateCount === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">Customer already rated</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">
+                                {posterName || "Customer"}
+                              </h4>
+                              <p className="text-sm text-gray-600 mt-1">ID: {job.customerId}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setShowCustomerRatingModal(true);
+                                setShowRateCustomerModal(false);
+                              }}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                            >
+                              Rate
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ) : customersRatedCount === 0 || !customerReview ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No rated customers</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-semibold text-gray-900">
+                              {posterName || "Customer"}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-1">ID: {job.customerId}</p>
+                            {typeof customerReview?.rating === "number" && (
+                              <div className="mt-2 flex items-center gap-1 text-sm text-gray-700">
+                                <FiStar className="text-yellow-400" />
+                                <span className="font-semibold">{customerReview.rating}</span>
+                                <span className="text-gray-500">/ 5</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEditingCustomerReview({
+                                reviewId: customerReview?.reviewId,
+                                rating: customerReview?.rating,
+                                comment: customerReview?.comment,
+                                edited: customerReview?.edited || false,
+                              });
+                              setShowEditCustomerRatingModal(true);
+                              setShowRateCustomerModal(false);
+                            }}
+                            disabled={customerReview?.edited}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                              customerReview?.edited
+                                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                : "bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
+                          >
+                            {customerReview?.edited ? "Already Edited" : "Edit Rating"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Rating Modal */}
         {showRatingModal && ratingTasker && (
           <CreateReviewModal
@@ -2919,6 +3207,36 @@ const JobDetails = () => {
             initialRating={editingReview.rating}
             initialComment={editingReview.comment}
             edited={editingReview.edited}
+          />
+        )}
+
+        {showCustomerRatingModal && job && (
+          <CreateReviewModal
+            isOpen={showCustomerRatingModal}
+            onClose={() => setShowCustomerRatingModal(false)}
+            onSuccess={async () => {
+              await fetchCustomerReviewStatus();
+              setRateCustomerTab("rated");
+            }}
+            taskerId={job.customerId}
+            jobId={job.jobId}
+          />
+        )}
+
+        {showEditCustomerRatingModal && editingCustomerReview && (
+          <EditReviewModal
+            isOpen={showEditCustomerRatingModal}
+            onClose={() => {
+              setShowEditCustomerRatingModal(false);
+              setEditingCustomerReview(null);
+            }}
+            onSuccess={async () => {
+              await fetchCustomerReviewStatus();
+            }}
+            reviewId={editingCustomerReview.reviewId}
+            initialRating={editingCustomerReview.rating}
+            initialComment={editingCustomerReview.comment}
+            edited={editingCustomerReview.edited}
           />
         )}
       </div>
